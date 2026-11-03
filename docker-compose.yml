@@ -1,0 +1,45 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: travel-guide-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-TravelGuide123!}
+      MYSQL_DATABASE: multilingual_travel_guide
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_PASSWORD:-TravelGuide123!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    container_name: multilingual-travel-guide-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:mysql://mysql:3306/multilingual_travel_guide?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:-TravelGuide123!}
+      JWT_SECRET: ${JWT_SECRET:-replace-this-with-a-long-random-secret-at-least-32-bytes}
+      GOOGLE_CLOUD_PROJECT_ID: ${GOOGLE_CLOUD_PROJECT_ID:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+      AUDIO_DIRECTORY: /app/storage/audio
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-service-account.json
+    ports:
+      - "8080:8080"
+    volumes:
+      - audio_data:/app/storage/audio
+      - ./secrets/google-service-account.json:/run/secrets/google-service-account.json:ro
+
+volumes:
+  mysql_data:
+  audio_data:

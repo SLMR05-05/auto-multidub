@@ -1,0 +1,45 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/multilingual_travel_guide?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-this-development-secret-key-at-least-32-bytes}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  audio-directory: ${AUDIO_DIRECTORY:./storage/audio}
+  seed-admin:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
+    full-name: ${ADMIN_FULL_NAME:System Admin}
+
+google:
+  cloud:
+    project-id: ${GOOGLE_CLOUD_PROJECT_ID:}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+libretranslate:
+  base-url: http://127.0.0.1:5001
+
+logging:
+  level:
+    org.springframework.security: TRACE

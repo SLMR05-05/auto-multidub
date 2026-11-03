@@ -1,0 +1,19 @@
+# LibreTranslate models and cache
+libretranslate-models/
+libretranslate-cache/
+
+# Piper voice models
+*.onnx
+*.onnx.json
+
+# Generated audio
+*.wav
+
+# Java build
+target/
+
+# Python cache
+__pycache__/
+*.pyc
+.venv/
+venv/
