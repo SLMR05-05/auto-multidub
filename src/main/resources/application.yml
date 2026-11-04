@@ -1,12 +1,24 @@
+# ==============================================================================
+# Multilingual Travel Guide & Auto-Narration Backend
+# Cấu hình Spring Boot - Đọc tự động các biến từ file .env
+# ==============================================================================
+
 server:
   port: ${SERVER_PORT:8080}
 
 spring:
+  config:
+    # Hỗ trợ nạp trực tiếp file .env theo chuẩn Spring Boot 3
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/multilingual_travel_guide?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh}
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:123456}
+    password: ${DB_PASSWORD:123456789}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -14,12 +26,17 @@ spring:
     show-sql: false
     properties:
       hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
+
   servlet:
     multipart:
       max-file-size: 20MB
       max-request-size: 20MB
 
+# ------------------------------------------------------------------------------
+# App Specific Configurations (Được nạp từ .env)
+# ------------------------------------------------------------------------------
 app:
   jwt:
     secret: ${JWT_SECRET:change-this-development-secret-key-at-least-32-bytes}
@@ -33,7 +50,7 @@ app:
     image-dir: ${IMAGE_DIRECTORY:./storage/images}
     package-dir: ${PACKAGE_DIRECTORY:./storage/packages}
   qr:
-    base-url: ${APP_QR_BASE_URL:https://auto-narration.local/q/}
+    base-url: ${APP_QR_BASE_URL:http://localhost:8080/q/}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
   seed-admin:

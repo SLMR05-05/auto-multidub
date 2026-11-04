@@ -2,6 +2,7 @@ package com.travelguide.config;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.env.EnvironmentPostProcessor;
+import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 
@@ -12,11 +13,17 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Loads a local .env file (KEY=VALUE) into the Spring Environment without
- * requiring the user to export variables manually. Real environment variables
- * and JVM system properties always take precedence over values from .env.
+ * Loads a local .env file (KEY=VALUE) into the Spring Environment with HIGHEST_PRECEDENCE
+ * so that all placeholders in application.yml (${VAR_NAME}) resolve directly from .env.
+ * Real environment variables and JVM system properties (-D) always take precedence over .env.
  */
-public class DotenvEnvironmentPostProcessor implements EnvironmentPostProcessor {
+public class DotenvEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
+
+    @Override
+    public int getOrder() {
+        // Runs before ConfigDataEnvironmentPostProcessor (HIGHEST_PRECEDENCE + 10)
+        return Ordered.HIGHEST_PRECEDENCE;
+    }
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
@@ -42,19 +49,17 @@ public class DotenvEnvironmentPostProcessor implements EnvironmentPostProcessor 
                 if (key.isEmpty()) {
                     continue;
                 }
-                // Strip a single pair of surrounding quotes.
+                // Strip surrounding single or double quotes
                 if (value.length() >= 2
                         && ((value.startsWith("\"") && value.endsWith("\""))
                         || (value.startsWith("'") && value.endsWith("'")))) {
                     value = value.substring(1, value.length() - 1);
                 }
-                // Do not override real environment variables / system properties.
+                // Allow OS environment variables and JVM -D properties to override .env
                 if (System.getenv(key) != null || System.getProperty(key) != null) {
                     continue;
                 }
-                if (environment.getProperty(key) == null) {
-                    values.put(key, value);
-                }
+                values.put(key, value);
             }
         } catch (Exception ignored) {
             // .env is optional; ignore parse errors.
@@ -63,23 +68,36 @@ public class DotenvEnvironmentPostProcessor implements EnvironmentPostProcessor 
         if (!values.isEmpty()) {
             environment.getPropertySources().addFirst(new MapPropertySource("dotenv", values));
             values.forEach((key, value) -> System.setProperty(key, String.valueOf(value)));
+            System.out.println("[Dotenv] Loaded " + values.size() + " properties from: " + file.getAbsolutePath());
         }
     }
 
     private File findEnvFile() {
-        // Prefer the current working directory (project root when running mvn).
+        // 1. Current working directory
         File current = new File(".env");
         if (current.isFile()) {
-            return current;
+            return current.getAbsoluteFile();
         }
-        // Fall back to the directory of the jar / classpath root.
+
+        // 2. Fall back to user.dir property
         String userDir = System.getProperty("user.dir");
         if (userDir != null) {
             File candidate = new File(userDir, ".env");
             if (candidate.isFile()) {
-                return candidate;
+                return candidate.getAbsoluteFile();
             }
         }
+
+        // 3. Search up parent directories (up to 3 levels)
+        File dir = new File(".").getAbsoluteFile();
+        for (int i = 0; i < 3 && dir != null; i++) {
+            File candidate = new File(dir, ".env");
+            if (candidate.isFile()) {
+                return candidate.getAbsoluteFile();
+            }
+            dir = dir.getParentFile();
+        }
+
         return null;
     }
 }
