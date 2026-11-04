@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:travelguide;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+app:
+  seed-admin:
+    email: admin@test.local
+    password: Admin123!
+    full-name: Test Admin
+  qr:
+    base-url: https://test.local/q/
+
+logging:
+  level:
+    root: WARN

@@ -25,6 +25,17 @@ app:
     secret: ${JWT_SECRET:change-this-development-secret-key-at-least-32-bytes}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   audio-directory: ${AUDIO_DIRECTORY:./storage/audio}
+  tts:
+    python-command: ${PIPER_PYTHON_COMMAND:python}
+    piper-model: ${PIPER_MODEL:vi_VN-vais1000-medium}
+  storage:
+    audio-dir: ${AUDIO_DIRECTORY:./storage/audio}
+    image-dir: ${IMAGE_DIRECTORY:./storage/images}
+    package-dir: ${PACKAGE_DIRECTORY:./storage/packages}
+  qr:
+    base-url: ${APP_QR_BASE_URL:https://auto-narration.local/q/}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
   seed-admin:
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
@@ -37,9 +48,10 @@ google:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
 libretranslate:
-  base-url: http://127.0.0.1:5001
+  base-url: ${LIBRETRANSLATE_BASE_URL:http://127.0.0.1:5001}
 
 logging:
   level:
-    org.springframework.security: TRACE
+    org.springframework.security: INFO

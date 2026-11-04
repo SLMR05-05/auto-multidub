@@ -7,6 +7,6 @@ RUN mvn -q -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/multilingual-travel-guide-1.0.0.jar app.jar
-RUN mkdir -p /app/storage/audio
+RUN mkdir -p /app/storage/audio /app/storage/images /app/storage/packages
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -1,19 +1,117 @@
-# LibreTranslate models and cache
+# ==========================================
+# Auto-Narration & Voice AI Travel System
+# Root .gitignore Configuration
+# ==========================================
+
+# ------------------------------------------
+# 1. Node.js & Next.js Frontend
+# ------------------------------------------
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+build/
+dist/
+.turbo/
+**/.turbo/
+.npm
+.eslintcache
+
+# ------------------------------------------
+# 2. Java & Maven Backend
+# ------------------------------------------
+target/
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+!src/main/resources/**/*.jar
+!src/main/resources/**/*.war
+
+# ------------------------------------------
+# 3. Environment Variables & Secrets
+# ------------------------------------------
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+secrets/
+*.pem
+*.key
+*.p12
+
+# ------------------------------------------
+# 4. Logs & Debugging
+# ------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ------------------------------------------
+# 5. Runtime Media & Storage
+# ------------------------------------------
+storage/
+storage/audio/
+storage/images/
+storage/packages/
+
+# AI / TTS Voice models & LibreTranslate Cache
 libretranslate-models/
 libretranslate-cache/
-
-# Piper voice models
 *.onnx
 *.onnx.json
-
-# Generated audio
 *.wav
 
-# Java build
-target/
-
-# Python cache
+# ------------------------------------------
+# 6. Python Environments & Cache
+# ------------------------------------------
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .venv/
 venv/
+env/
+.pytest_cache/
+
+# ------------------------------------------
+# 7. IDE & Code Editors
+# ------------------------------------------
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ------------------------------------------
+# 8. Operating System Artifacts
+# ------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------
+# 9. Local Scripts & Diagnostics
+# ------------------------------------------
+powershell.cmd
