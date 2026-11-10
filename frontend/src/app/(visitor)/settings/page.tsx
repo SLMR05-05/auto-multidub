@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useLanguageStore } from '@/stores/languageStore';
-import { useAuthStore } from '@/stores/authStore';
 import {
   Settings,
   Globe,
@@ -12,16 +11,10 @@ import {
   Trash2,
   Check,
   Sliders,
-  User,
-  Heart,
-  ChevronRight,
-  Sparkles,
 } from 'lucide-react';
-import Link from 'next/link';
 
 export default function VisitorSettingsPage() {
   const { currentLang, setLanguage, getActiveLanguages } = useLanguageStore();
-  const { user, isAuthenticated, favorites } = useAuthStore();
   const languages = getActiveLanguages();
 
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
@@ -59,16 +52,6 @@ export default function VisitorSettingsPage() {
               Tùy biến ngôn ngữ, tốc độ phát TTS, độ nhạy GPS và quản lý quyền riêng tư
             </p>
           </div>
-
-          {/* Quick link to Profile */}
-          <Link
-            href="/profile"
-            className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white border border-slate-200/80 hover:border-emerald-500 text-xs font-semibold text-slate-700 shadow-xs hover:shadow-sm transition-all self-start md:self-auto"
-          >
-            <User className="w-4 h-4 text-emerald-600" />
-            <span>{isAuthenticated ? user?.fullName || 'Hồ sơ của tôi' : 'Đăng nhập tài khoản'}</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          </Link>
         </div>
 
         {notifySaved && (

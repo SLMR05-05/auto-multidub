@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { clearCmsSession } from '@/services/cms';
 import { Bell, ExternalLink, Send, ShieldCheck } from 'lucide-react';
 
 export default function CmsHeader() {
+  const router = useRouter();
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
@@ -11,8 +14,6 @@ export default function CmsHeader() {
           <ShieldCheck className="w-3.5 h-3.5" />
           Hệ thống Thuyết minh & AI Voice Assistant v2.0
         </span>
-        <span className="text-xs text-slate-400">|</span>
-        <span className="text-xs text-slate-500 font-medium">Phiên bản CSDL: DATA_VERSION 2</span>
       </div>
 
       <div className="flex items-center gap-3">
@@ -34,6 +35,11 @@ export default function CmsHeader() {
           <Send className="w-3.5 h-3.5" />
           Xuất bản dữ liệu
         </Link>
+
+        <button type="button" className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
+          onClick={() => { clearCmsSession(); router.replace('/cms/login'); }}>
+          Đăng xuất
+        </button>
 
         {/* Notification bell */}
         <button className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors relative">

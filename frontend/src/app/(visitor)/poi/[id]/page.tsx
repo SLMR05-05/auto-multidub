@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { MOCK_POIS } from '@/services/mockData';
+import { VisitorCatalogContent } from '@/components/visitor/VisitorCatalog';
+import type { Poi } from '@/types';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useAssistantStore } from '@/stores/assistantStore';
-import { useAuthStore } from '@/stores/authStore';
+import { useFavoriteStore } from '@/stores/favoriteStore';
 import {
   ArrowLeft,
   Volume2,
@@ -29,21 +30,30 @@ import {
   MessageSquare,
 } from 'lucide-react';
 
-export default function PoiDetailPage({ params }: { params?: { id: string } }) {
+export default function PoiDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  return (
+    <VisitorCatalogContent>
+      {({ pois }) => {
+        const poi = pois.find((item) => String(item.id) === id);
+        return poi
+          ? <PoiDetailContent key={poi.id} poi={poi} pois={pois} />
+          : <p role="alert" className="p-6">Không tìm thấy điểm thuyết minh.</p>;
+      }}
+    </VisitorCatalogContent>
+  );
+}
+
+function PoiDetailContent({ poi, pois }: { poi: Poi; pois: Poi[] }) {
   const router = useRouter();
-  const routeParams = useParams();
-  const idStr = (params?.id ?? routeParams?.id) as string;
-  const poiId = parseInt(idStr, 10) || 1;
-  const poi = MOCK_POIS.find((p) => p.id === poiId) || MOCK_POIS[0];
 
   const [activeImageIdx, setActiveImageIdx] = useState(0);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
   const [customQuestion, setCustomQuestion] = useState('');
 
-  const { currentPoi, isPlaying, playPoi, pause, resume, seek, currentTime, duration } = usePlayerStore();
+  const { currentPoi, isPlaying, playPoi, pause, resume, seek, currentTime, duration, playbackRate: playbackSpeed, setPlaybackRate: setPlaybackSpeed } = usePlayerStore();
   const { currentLang } = useLanguageStore();
   const { sendMessage } = useAssistantStore();
-  const { isFavorite, toggleFavorite } = useAuthStore();
+  const { isFavorite, toggleFavorite } = useFavoriteStore();
 
   const isCurrentPlaying = currentPoi?.id === poi.id && isPlaying;
   const isFav = isFavorite(poi.id);
@@ -67,7 +77,7 @@ export default function PoiDetailPage({ params }: { params?: { id: string } }) {
   };
 
   // Các điểm lân cận cùng phường hoặc ngẫu nhiên
-  const nearbyPois = MOCK_POIS.filter((p) => p.id !== poi.id).slice(0, 3);
+  const nearbyPois = pois.filter((p) => p.id !== poi.id).slice(0, 3);
 
   const images = poi.images && poi.images.length > 0
     ? poi.images
@@ -165,9 +175,9 @@ export default function PoiDetailPage({ params }: { params?: { id: string } }) {
                 <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
                   📍 Phường {poi.ward?.name || 'Quận 4'}
                 </span>
-                {poi.busStop && (
+                {poi.busStopName && (
                   <span className="px-3 py-1 rounded-full bg-sky-50 text-sky-700 text-xs font-medium flex items-center gap-1 border border-sky-100">
-                    <Bus className="w-3.5 h-3.5" /> Trạm {poi.busStop.name}
+                    <Bus className="w-3.5 h-3.5" /> Trạm {poi.busStopName}
                   </span>
                 )}
                 <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">

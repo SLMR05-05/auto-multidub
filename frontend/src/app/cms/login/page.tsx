@@ -2,31 +2,39 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ApiError } from '@/services/api';
+import { clearCmsSession, loginCms } from '@/services/cms';
 import { Lock, Mail, ShieldAlert, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 export default function CmsLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('Admin123!');
-  const [attempts, setAttempts] = useState(0);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [pending, setPending] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (attempts >= 4) {
-      setErrorMsg('Tài khoản đã bị tạm khóa do nhập sai quá 5 lần (FR-CMS-01). Vui lòng thử lại sau 15 phút.');
-      return;
+  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setErrorMsg('');
+    try {
+      clearCmsSession();
+      const role = await loginCms(email, password);
+      if (role) {
+        router.replace(role === 'EDITOR' ? '/cms/poi' : '/cms/dashboard');
+      } else {
+        setErrorMsg('Tài khoản này không có quyền truy cập CMS.');
+      }
+    } catch (error) {
+      const status = error instanceof ApiError ? error.status : undefined;
+      if (status === 423) setErrorMsg('Tài khoản đang bị khóa tạm thời.');
+      else if (status === 401 || status === 403) setErrorMsg('Không thể đăng nhập bằng thông tin đã nhập.');
+      else setErrorMsg('Không kết nối được dịch vụ đăng nhập. Vui lòng thử lại.');
+    } finally {
+      setPending(false);
     }
-
-    if (email === 'admin@example.com' && password === 'Admin123!') {
-      router.push('/cms/dashboard');
-    } else {
-      const nextAttempt = attempts + 1;
-      setAttempts(nextAttempt);
-      setErrorMsg(`Mật khẩu không chính xác. Bạn còn ${5 - nextAttempt} lần thử.`);
-    }
-  };
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950">
@@ -85,16 +93,15 @@ export default function CmsLoginPage() {
 
           <button
             type="submit"
+            disabled={pending}
             className="w-full mt-2 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 active:scale-98 transition-all"
           >
-            Đăng nhập hệ thống
+            {pending ? 'Đang đăng nhập…' : 'Đăng nhập hệ thống'}
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        <div className="mt-6 pt-5 border-t border-slate-800 text-center text-[11px] text-slate-500">
-          Demo: Email <span className="text-emerald-400">admin@example.com</span> / Pass <span className="text-emerald-400">Admin123!</span>
-        </div>
+
       </div>
     </div>
   );

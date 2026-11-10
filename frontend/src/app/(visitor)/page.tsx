@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import MapView from '@/components/visitor/MapView';
-import { MOCK_POIS, MOCK_WARDS } from '@/services/mockData';
+import { VisitorCatalogContent } from '@/components/visitor/VisitorCatalog';
+import type { VisitorCatalog } from '@/services/visitorCatalog';
 import { Poi } from '@/types';
 import { usePlayerStore } from '@/stores/playerStore';
-import { useAuthStore } from '@/stores/authStore';
+import { useFavoriteStore } from '@/stores/favoriteStore';
 import {
   Radio,
   Volume2,
@@ -22,26 +23,32 @@ import {
 import Link from 'next/link';
 
 export default function VisitorHomePage() {
-  const [selectedPoi, setSelectedPoi] = useState<Poi | null>(MOCK_POIS[0]);
+  return <VisitorCatalogContent>{(catalog) => <VisitorHomePageContent {...catalog} />}</VisitorCatalogContent>;
+}
+
+function VisitorHomePageContent({ pois, wards }: VisitorCatalog) {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [selectedWard, setSelectedWard] = useState<number | 'ALL'>('ALL');
 
   const { playPoi, autoPlayEnabled, toggleAutoPlay } = usePlayerStore();
-  const { isFavorite, toggleFavorite } = useAuthStore();
+  const { isFavorite, toggleFavorite } = useFavoriteStore();
 
   const handleSelectPoi = (poi: Poi) => {
-    setSelectedPoi(poi);
+    setSelectedId(poi.id);
   };
 
   const handlePlayPoi = (poi: Poi) => {
     playPoi(poi, true);
   };
 
-  const filteredPois = MOCK_POIS.filter((poi) => {
+  const filteredPois = pois.filter((poi) => {
     const matchSearch = poi.name.toLowerCase().includes(search.toLowerCase());
     const matchWard = selectedWard === 'ALL' || poi.wardId === selectedWard;
     return matchSearch && matchWard;
   });
+
+  const selectedPoi = filteredPois.find((poi) => poi.id === selectedId) ?? filteredPois[0] ?? null;
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] bg-slate-900 flex flex-col md:flex-row">
@@ -121,9 +128,9 @@ export default function VisitorHomePage() {
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              Tất cả ({MOCK_POIS.length})
+              Tất cả ({pois.length})
             </button>
-            {MOCK_WARDS.map((w) => (
+            {wards.map((w) => (
               <button
                 key={w.id}
                 onClick={() => setSelectedWard(w.id)}

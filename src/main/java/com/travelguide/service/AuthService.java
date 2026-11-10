@@ -43,9 +43,10 @@ public class AuthService {
         return response(user);
     }
 
-    @Transactional
+    // Failed credentials must persist the attempt counter and lock timestamp.
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public AuthResponse login(LoginRequest request) {
-        AppUser user = users.findByEmail(request.email().toLowerCase().trim())
+        AppUser user = users.findByEmailForUpdate(request.email().toLowerCase().trim())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                         "Invalid email or password"));
 

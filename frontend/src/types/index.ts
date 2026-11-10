@@ -69,6 +69,7 @@ export interface Poi {
   name: string;
   wardId?: number;
   busStopId?: number;
+  busStopName?: string;
   latitude: number;
   longitude: number;
   radiusMeters: number; // 20 - 300m (default 50m)
@@ -152,3 +153,4 @@ export interface AppUser {
   phoneNumber?: string;
   provider?: 'LOCAL' | 'GOOGLE' | 'APPLE' | 'FACEBOOK';
 }
+

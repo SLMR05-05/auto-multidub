@@ -1,6 +1,7 @@
 'use client';
 
-import { MOCK_TOURS } from '@/services/mockData';
+import { VisitorCatalogContent } from '@/components/visitor/VisitorCatalog';
+import type { VisitorCatalog } from '@/services/visitorCatalog';
 import {
   Compass,
   Clock,
@@ -16,6 +17,10 @@ import Link from 'next/link';
 import { usePlayerStore } from '@/stores/playerStore';
 
 export default function ToursPage() {
+  return <VisitorCatalogContent>{(catalog) => <ToursPageContent {...catalog} />}</VisitorCatalogContent>;
+}
+
+function ToursPageContent({ tours }: VisitorCatalog) {
   const { playPoi } = usePlayerStore();
 
   return (
@@ -39,14 +44,14 @@ export default function ToursPage() {
           {/* Stats pill on desktop */}
           <div className="hidden md:flex items-center gap-3 text-xs text-slate-600">
             <span className="bg-white px-3.5 py-2 rounded-2xl border border-slate-200/80 shadow-xs font-medium">
-              🧭 <strong className="text-slate-900">{MOCK_TOURS.length}</strong> Tuyến tour sẵn sàng
+              🧭 <strong className="text-slate-900">{tours.length}</strong> Tuyến tour sẵn sàng
             </span>
           </div>
         </div>
 
         {/* Tour Cards Grid (Mobile: 1 col, Desktop: 2-3 cols) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-          {MOCK_TOURS.map((tour) => {
+          {tours.map((tour) => {
             const stopCount = tour.pois?.length || 0;
             const firstPoiId = tour.pois?.[0]?.poi.id;
 
@@ -73,10 +78,7 @@ export default function ToursPage() {
 
                     <div className="absolute bottom-3 left-4 right-4">
                       <div className="flex items-center gap-3 text-emerald-300 text-[11px] font-semibold mb-1">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" /> ~{tour.estimatedMinutes} phút
-                        </span>
-                        <span>•</span>
+                        
                         <span className="flex items-center gap-1">
                           <MapPin className="w-3.5 h-3.5" /> {stopCount} trạm dừng
                         </span>

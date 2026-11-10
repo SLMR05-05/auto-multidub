@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { MOCK_POIS, MOCK_WARDS } from '@/services/mockData';
+import { VisitorCatalogContent } from '@/components/visitor/VisitorCatalog';
+import type { VisitorCatalog } from '@/services/visitorCatalog';
 import { Poi } from '@/types';
 import {
   Search,
@@ -17,18 +18,22 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePlayerStore } from '@/stores/playerStore';
-import { useAuthStore } from '@/stores/authStore';
+import { useFavoriteStore } from '@/stores/favoriteStore';
 
 export default function PoiListPage() {
+  return <VisitorCatalogContent>{(catalog) => <PoiListPageContent {...catalog} />}</VisitorCatalogContent>;
+}
+
+function PoiListPageContent({ pois, wards }: VisitorCatalog) {
   const [search, setSearch] = useState('');
   const [selectedWard, setSelectedWard] = useState<number | 'ALL'>('ALL');
   const [sortBy, setSortBy] = useState<'DISTANCE' | 'NAME'>('DISTANCE');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
 
   const { playPoi } = usePlayerStore();
-  const { isFavorite, toggleFavorite } = useAuthStore();
+  const { isFavorite, toggleFavorite } = useFavoriteStore();
 
-  let filteredPois = MOCK_POIS.filter((poi) => {
+  let filteredPois = pois.filter((poi) => {
     const matchSearch =
       poi.name.toLowerCase().includes(search.toLowerCase()) ||
       poi.translations?.some((t) =>
@@ -64,10 +69,10 @@ export default function PoiListPage() {
           {/* Stats pills on desktop */}
           <div className="hidden md:flex items-center gap-3 text-xs text-slate-600">
             <span className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-xs font-medium">
-              📍 <strong className="text-slate-900">{MOCK_POIS.length}</strong> Điểm di tích
+              📍 <strong className="text-slate-900">{pois.length}</strong> Điểm di tích
             </span>
             <span className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-xs font-medium">
-              🏛️ <strong className="text-slate-900">{MOCK_WARDS.length}</strong> Phường thí điểm
+              🏛️ <strong className="text-slate-900">{wards.length}</strong> Phường thí điểm
             </span>
           </div>
         </div>
@@ -124,9 +129,9 @@ export default function PoiListPage() {
                   : 'bg-slate-50 md:bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
               }`}
             >
-              Tất cả ({MOCK_POIS.length})
+              Tất cả ({pois.length})
             </button>
-            {MOCK_WARDS.map((w) => (
+            {wards.map((w) => (
               <button
                 key={w.id}
                 onClick={() => setSelectedWard(w.id)}
