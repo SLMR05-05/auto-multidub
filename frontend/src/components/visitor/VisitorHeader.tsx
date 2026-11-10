@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuthStore } from '@/stores/authStore';
 import { useLanguageStore } from '@/stores/languageStore';
 import {
   Compass,
@@ -13,23 +12,17 @@ import {
   Sparkles,
   Settings,
   Download,
-  User,
-  Heart,
-  LogOut,
   ChevronDown,
   Globe,
   Radio,
-  Shield,
   Layers,
 } from 'lucide-react';
 
 export default function VisitorHeader() {
   const pathname = usePathname();
-  const { user, isAuthenticated, logout } = useAuthStore();
   const { currentLang, languages, setLanguage } = useLanguageStore();
 
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
-  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
 
   const navLinks = [
     { label: 'Bản đồ', href: '/', icon: Map },
@@ -92,18 +85,8 @@ export default function VisitorHeader() {
           })}
         </nav>
 
-        {/* Right Section: Language Switcher, CMS link & User Profile */}
+        {/* Right Section: Language Switcher */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Link to CMS Portal for Admins/Editors */}
-          <Link
-            href="/cms/dashboard"
-            className="hidden lg:flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-emerald-700 bg-slate-100 hover:bg-emerald-50 px-2.5 py-1.5 rounded-xl transition-colors border border-slate-200"
-            title="Dành cho Quản trị viên & Biên tập viên"
-          >
-            <Shield className="w-3.5 h-3.5 text-slate-500" />
-            Vào CMS
-          </Link>
-
           {/* Language Switcher Dropdown */}
           <div className="relative">
             <button
@@ -141,88 +124,6 @@ export default function VisitorHeader() {
               </div>
             )}
           </div>
-
-          {/* User Profile or Login */}
-          {isAuthenticated && user ? (
-            <div className="relative">
-              <button
-                onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                className="flex items-center gap-2 p-1 pl-2 rounded-full border border-slate-200 hover:border-emerald-300 bg-white transition-all"
-              >
-                <span className="text-xs font-bold text-slate-800 hidden sm:inline max-w-28 truncate">
-                  {user.fullName}
-                </span>
-                {user.avatarUrl ? (
-                  <img
-                    src={user.avatarUrl}
-                    alt={user.fullName}
-                    className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/20"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
-                    {user.fullName.charAt(0)}
-                  </div>
-                )}
-              </button>
-
-              {isUserDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50">
-                  <div className="px-3 py-2 border-b border-slate-100">
-                    <p className="text-xs font-bold text-slate-900 truncate">{user.fullName}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
-                  </div>
-
-                  <div className="py-1 space-y-0.5">
-                    <Link
-                      href="/profile"
-                      onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                    >
-                      <User className="w-4 h-4 text-emerald-600" />
-                      Hồ sơ cá nhân
-                    </Link>
-                    <Link
-                      href="/profile"
-                      onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                    >
-                      <Heart className="w-4 h-4 text-rose-500" />
-                      Địa điểm yêu thích
-                    </Link>
-                    <Link
-                      href="/settings"
-                      onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                    >
-                      <Settings className="w-4 h-4 text-slate-400" />
-                      Cài đặt hệ thống
-                    </Link>
-                  </div>
-
-                  <div className="pt-1 mt-1 border-t border-slate-100">
-                    <button
-                      onClick={() => {
-                        logout();
-                        setIsUserDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Đăng xuất
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="flex items-center gap-1.5 py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
-            >
-              <User className="w-3.5 h-3.5" />
-              Đăng nhập
-            </Link>
-          )}
         </div>
       </div>
     </header>

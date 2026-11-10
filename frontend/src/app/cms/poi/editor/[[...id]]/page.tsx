@@ -1,33 +1,76 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save, MapPin, Sliders, AlertTriangle, Check, Layers } from 'lucide-react';
-import { MOCK_POIS, MOCK_WARDS, MOCK_BUS_STOPS } from '@/services/mockData';
+import { getPoiEditor, publishCmsPoi, saveCmsPoi, saveVietnamese } from '@/services/cmsPois';
+
+type EditorData = Awaited<ReturnType<typeof getPoiEditor>>;
 
 export default function CmsPoiEditorPage() {
+  const id = useParams<{ id?: string[] }>().id?.[0];
+  const [result, setResult] = useState<{ id?: string; data: EditorData | null } | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getPoiEditor(id, controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) setResult({ id, data });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setResult({ id, data: null });
+      });
+    return () => controller.abort();
+  }, [id]);
+
+  if (!result || result.id !== id) return <p role="status">Đang tải dữ liệu POI…</p>;
+  if (!result.data) return <p role="alert">Không tải được POI hoặc dữ liệu địa bàn.</p>;
+  return <PoiEditor key={id ?? 'new'} {...result.data} />;
+}
+
+function PoiEditor({ poi, wards, stops, vietnamese }: EditorData) {
   const router = useRouter();
+  const [code, setCode] = useState(poi?.code ?? '');
+  const [name, setName] = useState(poi?.name ?? '');
+  const [wardId, setWardId] = useState(poi?.wardId ?? 0);
+  const [busStopId, setBusStopId] = useState(poi?.busStopId ?? 0);
+  const [latitude, setLatitude] = useState(poi?.latitude ?? 10.7681);
+  const [longitude, setLongitude] = useState(poi?.longitude ?? 106.7052);
+  const [radiusMeters, setRadiusMeters] = useState(poi?.radiusMeters ?? 50);
+  const [priority, setPriority] = useState(poi?.priority ?? 3);
+  const [cooldownMinutes, setCooldownMinutes] = useState(poi?.cooldownMinutes ?? 30);
+  const [translationName, setTranslationName] = useState(vietnamese?.name ?? poi?.name ?? '');
+  const [description, setDescription] = useState(vietnamese?.description ?? '');
+  const [ttsScript, setTtsScript] = useState(vietnamese?.ttsScript ?? '');
+  const [pending, setPending] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
 
-  const [code, setCode] = useState('POI_DEMO_KH01');
-  const [name, setName] = useState('Di tích Lịch sử Cầu Khánh Hội');
-  const [wardId, setWardId] = useState(1);
-  const [busStopId, setBusStopId] = useState(1);
-  const [latitude, setLatitude] = useState(10.7681);
-  const [longitude, setLongitude] = useState(106.7052);
-  const [radiusMeters, setRadiusMeters] = useState(50);
-  const [priority, setPriority] = useState(3);
-  const [cooldownMinutes, setCooldownMinutes] = useState(30);
+  async function runAction(action: () => Promise<void>) {
+    if (pending) return;
+    setPending(true);
+    setNotice('');
+    setError('');
+    try {
+      await action();
+    } catch {
+      setError('Không thực hiện được thao tác. Kiểm tra dữ liệu, quyền CMS và kết nối.');
+    } finally {
+      setPending(false);
+    }
+  }
 
-  const [savedSuccess, setSavedSuccess] = useState(false);
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavedSuccess(true);
-    setTimeout(() => {
-      router.push('/cms/poi');
-    }, 1200);
-  };
+  function handleSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void runAction(async () => {
+      const saved = await saveCmsPoi({ code, name, wardId: wardId || null, busStopId: busStopId || null,
+        latitude, longitude, radiusMeters, priority, cooldownMinutes }, poi?.id);
+      setCode(saved.code);
+      setNotice('Đã lưu thông tin POI.');
+      if (!poi) router.replace(`/cms/poi/editor/${saved.id}`);
+    });
+  }
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -47,7 +90,9 @@ export default function CmsPoiEditorPage() {
         </div>
 
         <button
-          onClick={handleSave}
+          type="submit"
+          form="poi-form"
+          disabled={pending}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm active:scale-95 transition-all"
         >
           <Save className="w-4 h-4" />
@@ -55,16 +100,13 @@ export default function CmsPoiEditorPage() {
         </button>
       </div>
 
-      {savedSuccess && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-semibold flex items-center gap-2">
-          <Check className="w-4 h-4" /> Đã lưu thông tin POI thành công vào CSDL!
-        </div>
-      )}
+      {notice && <p role="status" className="text-sm text-emerald-800">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
 
       {/* Editor Grid: Left = Form, Right = Interactive Geofence Map */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Form */}
-        <form onSubmit={handleSave} className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+        <form id="poi-form" onSubmit={handleSave} className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2">
             1. Thông tin cơ bản & Phân cấp hành chính
           </h2>
@@ -101,7 +143,8 @@ export default function CmsPoiEditorPage() {
                 onChange={(e) => setWardId(parseInt(e.target.value, 10))}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
               >
-                {MOCK_WARDS.map((w) => (
+                <option value={0}>Chưa chọn phường</option>
+                  {wards.map((w) => (
                   <option key={w.id} value={w.id}>
                     P. {w.name}
                   </option>
@@ -116,7 +159,8 @@ export default function CmsPoiEditorPage() {
                 onChange={(e) => setBusStopId(parseInt(e.target.value, 10))}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
               >
-                {MOCK_BUS_STOPS.map((b) => (
+                <option value={0}>Chưa chọn trạm</option>
+                  {stops.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
                   </option>
@@ -249,11 +293,47 @@ export default function CmsPoiEditorPage() {
           <div className="p-3.5 bg-emerald-50/60 rounded-xl border border-emerald-200 text-xs text-emerald-800 mt-4 flex items-start gap-2">
             <Check className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
             <span>
-              Bán kính <strong>{radiusMeters} mét</strong> là hợp lý, không chồng lấn với các điểm di tích lân cận trong cùng khu vực Phường {MOCK_WARDS[wardId - 1]?.name}.
+              Bán kính xem trước <strong>{radiusMeters} mét</strong>.
             </span>
           </div>
         </div>
       </div>
+      {poi && (
+        <form className="space-y-3 rounded-xl border bg-white p-5" onSubmit={(event) => {
+          event.preventDefault();
+          const publish = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'publish';
+          void runAction(async () => {
+            await saveVietnamese(poi.id, { name: translationName.trim(), description: description.trim(), ttsScript: ttsScript.trim() });
+            setNotice('Đã lưu nội dung tiếng Việt.');
+            if (publish) {
+              const result = await publishCmsPoi(poi.id);
+              if (result.issues.length) setError(result.issues.map((issue) => issue.message).join(' · '));
+              else setNotice(`Đã xuất bản POI ở phiên bản ${result.dataVersion}.`);
+            }
+          });
+        }}>
+          <h2 className="font-bold">Nội dung tiếng Việt</h2>
+          <label className="block">Tiêu đề
+            <input required maxLength={250} value={translationName} onChange={(e) => setTranslationName(e.target.value)}
+              className="block w-full rounded border p-2" />
+          </label>
+          <label className="block">Mô tả
+            <textarea required value={description} onChange={(e) => setDescription(e.target.value)}
+              className="block w-full rounded border p-2" />
+          </label>
+          <label className="block">Kịch bản thuyết minh TTS
+            <textarea value={ttsScript} onChange={(e) => setTtsScript(e.target.value)}
+              className="block w-full rounded border p-2" />
+          </label>
+          <div className="flex flex-wrap gap-3">
+            <button disabled={pending} className="rounded border px-4 py-2" type="submit">Lưu nội dung tiếng Việt</button>
+            <button disabled={pending} className="rounded bg-emerald-700 px-4 py-2 text-white" type="submit" value="publish">
+              Lưu nội dung và xuất bản
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
+

@@ -1,27 +1,69 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { MOCK_POIS, MOCK_WARDS } from '@/services/mockData';
+import { archiveCmsPoi, listCmsPois, listCmsWards, type CmsPoi } from '@/services/cmsPois';
 import { MapPin, Plus, Search, Edit3, Trash2, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
-import { Poi } from '@/types';
 
 export default function CmsPoiListPage() {
-  const [pois, setPois] = useState<Poi[]>(MOCK_POIS);
+  const [pois, setPois] = useState<CmsPoi[]>([]);
+  const [wards, setWards] = useState<Awaited<ReturnType<typeof listCmsWards>>>([]);
   const [search, setSearch] = useState('');
-  const [wardFilter, setWardFilter] = useState('ALL');
+  const [wardFilter, setWardFilter] = useState('');
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [revision, setRevision] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [archiving, setArchiving] = useState<number | null>(null);
+  const [error, setError] = useState('');
 
-  const filtered = pois.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase());
-    const matchWard = wardFilter === 'ALL' || p.ward?.name === wardFilter;
-    return matchSearch && matchWard;
-  });
+  useEffect(() => {
+    const controller = new AbortController();
+    listCmsWards(controller.signal).then(setWards).catch(() => {
+      if (!controller.signal.aborted) setError('Không tải được danh sách phường.');
+    });
+    return () => controller.abort();
+  }, []);
 
-  const handleDelete = (id: number) => {
-    if (confirm('Bạn có chắc chắn muốn xóa mềm (soft delete) điểm POI này không?')) {
-      setPois(pois.filter((p) => p.id !== id));
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    const query = new URLSearchParams({ page: String(page), size: '20' });
+    if (search.trim()) query.set('search', search.trim());
+    if (wardFilter) query.set('wardId', wardFilter);
+    listCmsPois(query, controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setPois(data.content);
+        setTotalPages(data.totalPages);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setPois([]);
+          setTotalPages(0);
+          setError('Không tải được danh sách POI. Kiểm tra phiên CMS hoặc kết nối.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [search, wardFilter, page, revision]);
+
+  async function handleDelete(id: number) {
+    if (archiving !== null || !window.confirm('Lưu trữ điểm thuyết minh này?')) return;
+    setArchiving(id);
+    setError('');
+    try {
+      await archiveCmsPoi(id);
+      setRevision((value) => value + 1);
+    } catch {
+      setError('Không lưu trữ được POI. Kiểm tra quyền và các liên kết đang sử dụng điểm này.');
+    } finally {
+      setArchiving(null);
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -53,7 +95,7 @@ export default function CmsPoiListPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             placeholder="Tìm theo tên POI hoặc mã định danh..."
             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
           />
@@ -63,18 +105,22 @@ export default function CmsPoiListPage() {
           <span className="text-xs text-slate-500 shrink-0">Lọc theo phường:</span>
           <select
             value={wardFilter}
-            onChange={(e) => setWardFilter(e.target.value)}
+            onChange={(e) => { setWardFilter(e.target.value); setPage(0); }}
             className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none font-medium"
           >
-            <option value="ALL">Tất cả ({pois.length})</option>
-            {MOCK_WARDS.map((w) => (
-              <option key={w.id} value={w.name}>
+            <option value="">Tất cả</option>
+            {wards.map((w) => (
+              <option key={w.id} value={w.id}>
                 P. {w.name}
               </option>
             ))}
           </select>
         </div>
       </div>
+
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {loading && <p role="status">Đang tải POI…</p>}
+      {!loading && !error && !pois.length && <p>Không có POI phù hợp.</p>}
 
       {/* POI Data Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
@@ -92,7 +138,7 @@ export default function CmsPoiListPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map((poi) => (
+            {!loading && pois.map((poi) => (
               <tr key={poi.id} className="hover:bg-slate-50/70 transition-colors">
                 <td className="py-3 px-4 font-mono font-bold text-slate-700">{poi.code}</td>
                 <td className="py-3 px-4">
@@ -100,8 +146,8 @@ export default function CmsPoiListPage() {
                   <span className="text-[10px] text-slate-400">Version {poi.version}</span>
                 </td>
                 <td className="py-3 px-4">
-                  <span className="font-semibold text-slate-700 block">P. {poi.ward?.name}</span>
-                  <span className="text-[10px] text-slate-500">{poi.busStop?.name}</span>
+                  <span className="font-semibold text-slate-700 block">P. {poi.wardName}</span>
+                  <span className="text-[10px] text-slate-500">{poi.busStopName}</span>
                 </td>
                 <td className="py-3 px-4 font-mono text-[11px] text-slate-600">
                   {poi.latitude.toFixed(4)}, {poi.longitude.toFixed(4)}
@@ -131,6 +177,7 @@ export default function CmsPoiListPage() {
 
                     <button
                       onClick={() => handleDelete(poi.id)}
+                      disabled={archiving !== null || poi.status === 'ARCHIVED'}
                       className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       title="Xóa mềm"
                     >
@@ -143,6 +190,13 @@ export default function CmsPoiListPage() {
           </tbody>
         </table>
       </div>
+      {totalPages > 1 && (
+        <nav aria-label="Phân trang POI" className="flex items-center gap-4">
+          <button disabled={loading || page === 0} onClick={() => setPage(page - 1)}>Trang trước</button>
+          <span>{page + 1} / {totalPages}</span>
+          <button disabled={loading || page + 1 >= totalPages} onClick={() => setPage(page + 1)}>Trang sau</button>
+        </nav>
+      )}
     </div>
   );
 }

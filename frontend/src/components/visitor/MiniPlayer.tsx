@@ -5,13 +5,14 @@ import { usePlayerStore } from '@/stores/playerStore';
 import { Play, Pause, X, Volume2, ChevronRight } from 'lucide-react';
 
 export default function MiniPlayer() {
-  const { currentPoi, isPlaying, progress, pause, resume, stop, audioMode } = usePlayerStore();
+  const { currentPoi, isPlaying, progress, pause, resume, stop, audioMode, error } = usePlayerStore();
 
   if (!currentPoi) return null;
 
   return (
     <div className="fixed bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-6 z-30 max-w-md w-full md:w-96 shadow-2xl">
       <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-2xl p-3 shadow-xl border border-slate-700/50 flex flex-col gap-2">
+        {error && <p role="alert" className="text-xs text-amber-300">{error}</p>}
         {/* Progress Bar */}
         <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
           <div
@@ -33,7 +34,7 @@ export default function MiniPlayer() {
                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 uppercase tracking-wider">
                   {audioMode}
                 </span>
-                <span className="text-xs text-slate-400 truncate">Đang phát thuyết minh</span>
+                <span className="text-xs text-slate-400 truncate">{isPlaying ? 'Đang phát thuyết minh' : 'Thuyết minh'}</span>
               </div>
               <h4 className="text-sm font-semibold truncate text-white">{currentPoi.name}</h4>
             </div>

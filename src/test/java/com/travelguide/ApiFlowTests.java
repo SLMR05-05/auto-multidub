@@ -32,6 +32,27 @@ class ApiFlowTests {
     private ObjectMapper mapper;
 
     @Test
+    void repeatedFailedLoginsLockTheAccount() throws Exception {
+        String email = UUID.randomUUID() + "@example.com";
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(java.util.Map.of(
+                                "email", email, "password", "Valid123!", "fullName", "Lock test"))))
+                .andExpect(status().isOk());
+
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(java.util.Map.of(
+                                    "email", email, "password", "incorrect"))))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(java.util.Map.of(
+                                "email", email, "password", "Valid123!"))))
+                .andExpect(status().isLocked());
+    }
+
+    @Test
     void fullContentToAnalyticsFlow() throws Exception {
         String token = login();
         long wardId = firstWard(token);
