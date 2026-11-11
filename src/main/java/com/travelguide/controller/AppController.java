@@ -124,6 +124,11 @@ public class AppController {
         return tracking.end(id, request == null ? null : request.endedAt());
     }
 
+    @PostMapping("/devices/register")
+    public DeviceResponse registerDevice(@Valid @RequestBody DeviceRegisterRequest request) {
+        return devices.register(request);
+    }
+
     @GetMapping("/devices/{deviceId}")
     public DeviceResponse device(@PathVariable String deviceId) {
         return devices.get(deviceId);

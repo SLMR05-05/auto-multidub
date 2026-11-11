@@ -8,6 +8,10 @@ interface Dashboard {
   validListens: number;
   qrScans: number;
   uniqueDevices: number;
+  triggerDistribution?: Record<string, number>;
+  languageDistribution?: Record<string, number>;
+  platformDistribution?: Record<string, number>;
+  osDistribution?: Record<string, number>;
 }
 interface TopPoi {
   poiId: number;

@@ -2,11 +2,13 @@ package com.travelguide.service;
 
 import com.travelguide.dto.AnalyticsDtos.*;
 import com.travelguide.dto.QrDtos.ScanStat;
+import com.travelguide.entity.Device;
 import com.travelguide.entity.LocationPoint;
 import com.travelguide.entity.PlaybackLog;
 import com.travelguide.entity.Poi;
 import com.travelguide.entity.QrCode;
 import com.travelguide.entity.TriggerType;
+import com.travelguide.repository.DeviceRepository;
 import com.travelguide.repository.LocationPointRepository;
 import com.travelguide.repository.PlaybackLogRepository;
 import com.travelguide.repository.PoiRepository;
@@ -32,15 +34,24 @@ public class AnalyticsService {
     private final LocationPointRepository locationPoints;
     private final PoiRepository pois;
     private final QrCodeRepository qrCodes;
+    private final DeviceRepository deviceRepository;
 
     public AnalyticsService(PlaybackLogRepository playbackLogs, TrackingSessionRepository sessions,
                             LocationPointRepository locationPoints, PoiRepository pois,
                             QrCodeRepository qrCodes) {
+        this(playbackLogs, sessions, locationPoints, pois, qrCodes, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AnalyticsService(PlaybackLogRepository playbackLogs, TrackingSessionRepository sessions,
+                            LocationPointRepository locationPoints, PoiRepository pois,
+                            QrCodeRepository qrCodes, DeviceRepository deviceRepository) {
         this.playbackLogs = playbackLogs;
         this.sessions = sessions;
         this.locationPoints = locationPoints;
         this.pois = pois;
         this.qrCodes = qrCodes;
+        this.deviceRepository = deviceRepository;
     }
 
     @Transactional(readOnly = true)
@@ -54,12 +65,42 @@ public class AnalyticsService {
         Map<String, Long> languages = logs.stream().collect(Collectors.groupingBy(
                 PlaybackLog::getLanguageCode, LinkedHashMap::new, Collectors.counting()));
 
+        Map<String, Long> platforms = new LinkedHashMap<>();
+        Map<String, Long> osList = new LinkedHashMap<>();
+        if (deviceRepository != null) {
+            List<Device> allDevices = deviceRepository.findAll();
+            platforms = allDevices.stream().collect(Collectors.groupingBy(d -> {
+                String type = d.getDeviceType();
+                if ("APP".equalsIgnoreCase(type) || "MOBILE_APP".equalsIgnoreCase(type)) {
+                    return "App (Ứng dụng di động)";
+                }
+                return "Web (Trình duyệt)";
+            }, LinkedHashMap::new, Collectors.counting()));
+
+            osList = allDevices.stream().collect(Collectors.groupingBy(d -> {
+                String os = d.getOsVersion();
+                if (os == null || os.isBlank()) return "Khác / Chưa rõ";
+                String lower = os.toLowerCase();
+                if (lower.contains("ios") || lower.contains("iphone") || lower.contains("ipad")) return "iOS";
+                if (lower.contains("android")) return "Android";
+                if (lower.contains("windows")) return "Windows";
+                if (lower.contains("mac")) return "macOS";
+                if (lower.contains("linux")) return "Linux";
+                return os;
+            }, LinkedHashMap::new, Collectors.counting()));
+        }
+        platforms.putIfAbsent("Web (Trình duyệt)", 0L);
+        platforms.putIfAbsent("App (Ứng dụng di động)", 0L);
+
         long uniqueDevices = logs.stream().map(PlaybackLog::getDeviceId).distinct().count();
+        if (uniqueDevices == 0 && deviceRepository != null) {
+            uniqueDevices = deviceRepository.count();
+        }
         long qrScans = logs.stream().filter(log -> log.getTriggerType() == TriggerType.QR).count();
         long sessionCount = sessions.countByStartedAtBetween(range.fromTime(), range.toTime());
 
         return new DashboardResponse(range.from(), range.to(), sessionCount,
-                logs.size(), valid.size(), qrScans, uniqueDevices, triggers, languages);
+                logs.size(), valid.size(), qrScans, uniqueDevices, triggers, languages, platforms, osList);
     }
 
     @Transactional(readOnly = true)

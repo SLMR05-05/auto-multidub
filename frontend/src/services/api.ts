@@ -1,4 +1,4 @@
-const apiOrigin = (process.env.NEXT_PUBLIC_API_ORIGIN ?? 'http://localhost:8080').replace(/\/+$/, '');
+const apiOrigin = (process.env.NEXT_PUBLIC_API_ORIGIN ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080').replace(/\/+$/, '');
 
 export function apiUrl(path: string) {
   return new URL(path, apiOrigin).href;

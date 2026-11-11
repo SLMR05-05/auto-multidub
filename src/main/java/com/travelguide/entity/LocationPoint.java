@@ -28,7 +28,7 @@ public class LocationPoint {
     @Column(nullable = false)
     private double longitude;
 
-    @Column(nullable = false)
+    @Column(name = "accuracy_meters", nullable = false)
     private double accuracy;
 
     @Column(name = "recorded_at", nullable = false)

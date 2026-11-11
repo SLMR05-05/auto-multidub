@@ -1,7 +1,6 @@
 package com.travelguide.service;
 
-import com.travelguide.dto.IngestDtos.DeleteDeviceResponse;
-import com.travelguide.dto.IngestDtos.DeviceResponse;
+import com.travelguide.dto.IngestDtos.*;
 import com.travelguide.entity.Device;
 import com.travelguide.repository.DeviceRepository;
 import com.travelguide.repository.LocationPointRepository;
@@ -44,9 +43,38 @@ public class DeviceService {
 
     @Transactional
     public Device touch(String deviceId) {
+        return touch(deviceId, null, null, null);
+    }
+
+    @Transactional
+    public Device touch(String deviceId, String deviceType, String osVersion, String appVersion) {
         Device device = getOrCreate(deviceId);
         device.setLastSeenAt(LocalDateTime.now());
+        if (deviceType != null && !deviceType.isBlank()) {
+            device.setDeviceType(deviceType.trim().toUpperCase());
+        }
+        if (osVersion != null && !osVersion.isBlank()) {
+            device.setOsVersion(osVersion.trim());
+        }
+        if (appVersion != null && !appVersion.isBlank()) {
+            device.setAppVersion(appVersion.trim());
+        }
         return devices.save(device);
+    }
+
+    @Transactional
+    public DeviceResponse register(DeviceRegisterRequest request) {
+        validateDeviceId(request.deviceId());
+        Device device = touch(request.deviceId(), request.deviceType(), request.osVersion(), request.appVersion());
+        if (request.preferredLanguage() != null && !request.preferredLanguage().isBlank()) {
+            device.setPreferredLanguage(request.preferredLanguage().trim());
+        }
+        if (request.analyticsConsent() != null) {
+            device.setAnalyticsConsent(request.analyticsConsent());
+            device.setConsentUpdatedAt(LocalDateTime.now());
+        }
+        device = devices.save(device);
+        return toResponse(device);
     }
 
     @Transactional
@@ -92,8 +120,16 @@ public class DeviceService {
     }
 
     public DeviceResponse toResponse(Device device) {
-        return new DeviceResponse(device.getDeviceId(), device.isAnalyticsConsent(),
-                device.getCreatedAt(), device.getLastSeenAt());
+        return new DeviceResponse(
+                device.getDeviceId(),
+                device.isAnalyticsConsent(),
+                device.getDeviceType(),
+                device.getOsVersion(),
+                device.getAppVersion(),
+                device.getPreferredLanguage(),
+                device.getCreatedAt(),
+                device.getLastSeenAt()
+        );
     }
 
     private void validateDeviceId(String deviceId) {

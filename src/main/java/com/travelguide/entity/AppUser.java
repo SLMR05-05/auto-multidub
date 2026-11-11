@@ -25,10 +25,10 @@ public class AppUser {
     @Column(nullable = false, length = 20)
     private Role role = Role.USER;
 
-    @Column(nullable = false)
+    @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
-    @Column(nullable = false)
+    @Column(name = "failed_attempts", nullable = false)
     private int failedLoginAttempts = 0;
 
     private LocalDateTime lockedUntil;

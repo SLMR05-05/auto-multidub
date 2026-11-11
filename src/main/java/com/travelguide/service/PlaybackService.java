@@ -122,7 +122,7 @@ public class PlaybackService {
                 log.setCompleted(completed);
                 log.setValidListen(listened >= minListen);
                 logs.save(log);
-                devices.touch(item.deviceId());
+                devices.touch(item.deviceId(), item.deviceType(), item.osVersion(), null);
                 accepted++;
             } catch (ResponseStatusException ex) {
                 rejected++;

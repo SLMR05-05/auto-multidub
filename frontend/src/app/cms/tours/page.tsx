@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { MOCK_TOURS, MOCK_POIS } from '@/services/mockData';
 import { Tour, TourStatus, Poi } from '@/types';
 import {
@@ -23,6 +24,15 @@ import {
   X
 } from 'lucide-react';
 
+const TourOsmMap = dynamic(() => import('@/components/cms/TourOsmMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-80 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-xs text-slate-400 animate-pulse border border-slate-200 dark:border-slate-800">
+      Đang tải bản đồ OpenStreetMap & Leaflet...
+    </div>
+  ),
+});
+
 export default function CmsTourPlannerPage() {
   const [tours, setTours] = useState<Tour[]>(MOCK_TOURS);
   const [search, setSearch] = useState('');
@@ -30,6 +40,9 @@ export default function CmsTourPlannerPage() {
   const [selectedTour, setSelectedTour] = useState<Tour | null>(MOCK_TOURS[0]);
   const [isEditing, setIsEditing] = useState(false);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [activePoiId, setActivePoiId] = useState<number | null>(
+    MOCK_TOURS[0]?.pois?.[0]?.poi?.id || 1
+  );
 
   // Form edit state
   const [editForm, setEditForm] = useState<{
@@ -52,6 +65,24 @@ export default function CmsTourPlannerPage() {
 
   const [availablePoiToAdd, setAvailablePoiToAdd] = useState<number>(MOCK_POIS[0]?.id || 1);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Auto-activate the first waypoint when opening or switching tour
+  React.useEffect(() => {
+    if (selectedTour?.pois && selectedTour.pois.length > 0) {
+      setActivePoiId(selectedTour.pois[0].poi.id);
+    } else {
+      setActivePoiId(null);
+    }
+  }, [selectedTour?.id]);
+
+  // Keep an active POI when adding/removing in editing mode
+  React.useEffect(() => {
+    if (isEditing && editForm.pois.length > 0) {
+      if (!activePoiId || !editForm.pois.some((p) => p.poi.id === activePoiId)) {
+        setActivePoiId(editForm.pois[0].poi.id);
+      }
+    }
+  }, [isEditing, editForm.pois, activePoiId]);
 
   // Filtered tours
   const filteredTours = tours.filter((t) => {
@@ -466,59 +497,102 @@ export default function CmsTourPlannerPage() {
                 </div>
 
                 <div className="space-y-2">
-                  {editForm.pois.map((item, idx) => (
-                    <div
-                      key={item.poi.id}
-                      className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
-                          {idx + 1}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-slate-800">{item.poi.name}</div>
-                          <div className="text-xs text-slate-500">
-                            {item.poi.ward?.name} • Bán kính Geofence: {item.poi.radiusMeters}m
+                  {editForm.pois.map((item, idx) => {
+                    const isActive = activePoiId === item.poi.id;
+                    return (
+                      <div
+                        key={item.poi.id}
+                        onClick={() => setActivePoiId(item.poi.id)}
+                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border ${
+                          isActive
+                            ? 'bg-amber-50/70 border-amber-400 shadow-sm ring-1 ring-amber-400/40'
+                            : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-7 h-7 rounded-full font-bold text-xs flex items-center justify-center flex-shrink-0 transition-transform ${
+                              isActive
+                                ? 'bg-amber-500 text-white ring-2 ring-amber-300 scale-105'
+                                : 'bg-emerald-600 text-white'
+                            }`}
+                          >
+                            {idx + 1}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                              {item.poi.name}
+                              {isActive && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
+                                  Đang chọn
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {item.poi.ward?.name} • Bán kính Geofence: {item.poi.radiusMeters}m
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => movePoi(idx, 'UP')}
-                          disabled={idx === 0}
-                          className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-white rounded disabled:opacity-30"
-                          title="Di chuyển lên trên"
-                        >
-                          <MoveUp className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => movePoi(idx, 'DOWN')}
-                          disabled={idx === editForm.pois.length - 1}
-                          className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-white rounded disabled:opacity-30"
-                          title="Di chuyển xuống dưới"
-                        >
-                          <MoveDown className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removePoi(idx)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded ml-1"
-                          title="Xóa khỏi tour"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => movePoi(idx, 'UP')}
+                            disabled={idx === 0}
+                            className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-white rounded disabled:opacity-30"
+                            title="Di chuyển lên trên"
+                          >
+                            <MoveUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => movePoi(idx, 'DOWN')}
+                            disabled={idx === editForm.pois.length - 1}
+                            className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-white rounded disabled:opacity-30"
+                            title="Di chuyển xuống dưới"
+                          >
+                            <MoveDown className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removePoi(idx)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded ml-1"
+                            title="Xóa khỏi tour"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {editForm.pois.length === 0 && (
                     <div className="p-6 text-center text-slate-400 text-xs border border-dashed rounded-lg">
                       Chưa có điểm POI nào. Chọn điểm từ danh sách trên để thêm vào lộ trình.
                     </div>
                   )}
                 </div>
+
+                {/* Real-time OpenStreetMap preview while editing */}
+                {editForm.pois.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 font-semibold">
+                      <span className="flex items-center gap-1.5">
+                        <Eye className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        Xem trước lộ trình thời gian thực (OpenStreetMap & Leaflet)
+                      </span>
+                      <span className="text-slate-400 text-[11px]">
+                        Tự động cập nhật khi thêm / bớt / đổi thứ tự POI
+                      </span>
+                    </div>
+
+                    <TourOsmMap
+                      waypoints={editForm.pois}
+                      selectedPoiId={activePoiId}
+                      onSelectWaypoint={(poiId) => setActivePoiId(poiId)}
+                      height="300px"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -574,112 +648,83 @@ export default function CmsTourPlannerPage() {
                 </button>
               </div>
 
-              {/* Route Map Preview Canvas (SVG Schema) */}
+              {/* Interactive Open-Source Leaflet & OpenStreetMap Route Preview */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-600 font-semibold">
+                <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 font-semibold">
                   <span className="flex items-center gap-1.5">
-                    <Route className="w-4 h-4 text-emerald-600" />
-                    Sơ đồ Lộ trình Tuyến Tour trực quan (Quận 4 Canvas)
+                    <Route className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    Bản đồ Lộ trình Tuyến Tour Thực địa (OpenStreetMap & Leaflet)
                   </span>
-                  <span className="text-emerald-700">Tự động nối tuyến theo order_index</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    Mã nguồn mở 100% • Tự động nối tuyến tuần tự
+                  </span>
                 </div>
 
-                <div className="relative w-full h-72 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl overflow-hidden border border-slate-700 p-4">
-                  <svg className="w-full h-full" viewBox="0 0 600 300">
-                    <defs>
-                      <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#10b981" />
-                        <stop offset="100%" stopColor="#06b6d4" />
-                      </linearGradient>
-                      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="3" result="glow" />
-                        <feComposite in="SourceGraphic" in2="glow" operator="over" />
-                      </filter>
-                    </defs>
-
-                    {/* District 4 Boundary lines simulation */}
-                    <path
-                      d="M 50 150 Q 150 40 300 50 T 550 100 Q 580 220 400 260 T 100 240 Z"
-                      fill="#0f172a"
-                      stroke="#334155"
-                      strokeWidth="2"
-                      strokeDasharray="4 4"
-                    />
-
-                    {/* Connecting line between waypoints */}
-                    {currentDisplayPois.length > 1 && (
-                      <path
-                        d={currentDisplayPois
-                          .map((item, idx) => {
-                            // Map coordinates to 600x300 canvas
-                            const x = 100 + idx * (400 / Math.max(1, currentDisplayPois.length - 1));
-                            const y = 80 + (idx % 2 === 0 ? 30 : 120);
-                            return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
-                          })
-                          .join(' ')}
-                        fill="none"
-                        stroke="url(#routeGradient)"
-                        strokeWidth="4"
-                        strokeDasharray="6 4"
-                        filter="url(#glow)"
-                        className="animate-pulse"
-                      />
-                    )}
-
-                    {/* POI Waypoint Nodes */}
-                    {currentDisplayPois.map((item, idx) => {
-                      const x = 100 + idx * (400 / Math.max(1, currentDisplayPois.length - 1));
-                      const y = 80 + (idx % 2 === 0 ? 30 : 120);
-                      return (
-                        <g key={item.poi.id} className="cursor-pointer">
-                          {/* Geofence outer ring */}
-                          <circle cx={x} cy={y} r="28" fill="#10b981" fillOpacity="0.15" stroke="#10b981" strokeWidth="1" />
-                          {/* Central node */}
-                          <circle cx={x} cy={y} r="14" fill="#10b981" stroke="#ffffff" strokeWidth="2.5" />
-                          <text x={x} y={y + 4} textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="bold">
-                            {idx + 1}
-                          </text>
-                          {/* Label box */}
-                          <rect x={x - 60} y={y + 20} width="120" height="20" rx="4" fill="#1e293b" fillOpacity="0.85" />
-                          <text x={x} y={y + 34} textAnchor="middle" fill="#f8fafc" fontSize="10" fontWeight="500">
-                            {item.poi.name.length > 18 ? item.poi.name.substring(0, 18) + '...' : item.poi.name}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                  <div className="absolute bottom-3 left-4 text-[11px] text-slate-400">
-                    Bản đồ Quận 4: Bến Nhà Rồng $\leftrightarrow$ Cầu Mống $\leftrightarrow$ Chợ Xóm Chiếu
-                  </div>
-                </div>
+                <TourOsmMap
+                  waypoints={currentDisplayPois}
+                  selectedPoiId={activePoiId}
+                  onSelectWaypoint={(poiId) => setActivePoiId(poiId)}
+                  height="380px"
+                />
               </div>
 
               {/* Waypoint Sequence Cards */}
               <div className="space-y-3">
-                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-emerald-600" />
-                  Danh sách các trạm dừng tuần tự ({currentDisplayPois.length} điểm)
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-emerald-600" />
+                    Danh sách các trạm dừng tuần tự ({currentDisplayPois.length} điểm)
+                  </h3>
+                  <span className="text-xs text-slate-400">
+                    Bấm vào trạm để phóng to và xem trên bản đồ
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {currentDisplayPois.map((item, idx) => (
-                    <div key={item.poi.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-3">
-                      <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-                        {idx + 1}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-semibold text-slate-900 text-sm">{item.poi.name}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          {item.poi.ward?.name} • Bán kính {item.poi.radiusMeters}m
+                  {currentDisplayPois.map((item, idx) => {
+                    const isActive = activePoiId === item.poi.id;
+                    return (
+                      <div
+                        key={item.poi.id}
+                        onClick={() => setActivePoiId(item.poi.id)}
+                        className={`p-3 rounded-lg flex items-start gap-3 cursor-pointer transition-all border ${
+                          isActive
+                            ? 'bg-amber-50/80 border-amber-400 shadow-md ring-2 ring-amber-400/50'
+                            : 'bg-slate-50 border-slate-200 hover:border-slate-300 hover:bg-slate-100/70'
+                        }`}
+                      >
+                        <div
+                          className={`w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5 transition-transform ${
+                            isActive
+                              ? 'bg-amber-500 text-white ring-2 ring-amber-300 scale-110'
+                              : 'bg-emerald-600 text-white'
+                          }`}
+                        >
+                          {idx + 1}
                         </div>
-                        {item.poi.busStop && (
-                          <div className="text-[11px] text-emerald-700 mt-1 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            Gần: {item.poi.busStop.name}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-semibold text-slate-900 text-sm truncate">
+                              {item.poi.name}
+                            </span>
+                            {isActive && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white flex-shrink-0">
+                                Đang xem
+                              </span>
+                            )}
                           </div>
-                        )}
+                          <div className="text-xs text-slate-500 mt-0.5">
+                            {item.poi.ward?.name} • Bán kính {item.poi.radiusMeters}m
+                          </div>
+                          {item.poi.busStop && (
+                            <div className="text-[11px] text-emerald-700 mt-1 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              Gần: {item.poi.busStop.name}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

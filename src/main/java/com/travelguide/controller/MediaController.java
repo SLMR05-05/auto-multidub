@@ -26,28 +26,70 @@ public class MediaController {
     @GetMapping("/audio/{id}")
     public ResponseEntity<Resource> audio(@PathVariable Long id) {
         PoiAudio audio = media.audioEntity(id);
-        return fileResponse(audio.getFilePath(), audio.getContentType(), audio.getFileName());
+        Path path = resolvePath(audio.getFilePath(), "audio");
+        if (!Files.exists(path)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File missing");
+        }
+        String contentType = audio.getContentType();
+        if (contentType == null || contentType.isBlank()) {
+            contentType = "audio/mpeg";
+        }
+        return fileResponse(path, contentType, audio.getFileName());
     }
 
     @GetMapping("/images/{id}")
     public ResponseEntity<Resource> image(@PathVariable Long id) {
         PoiImage image = media.imageEntity(id);
-        return fileResponse(image.getFilePath(), image.getContentType(), image.getFileName());
-    }
-
-    private ResponseEntity<Resource> fileResponse(String filePath, String contentType, String fileName) {
-        Path path = Path.of(filePath).toAbsolutePath().normalize();
+        Path path = resolvePath(image.getFilePath(), "images");
         if (!Files.exists(path)) {
+            if (image.getImageUrl() != null && image.getImageUrl().startsWith("http")) {
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .location(java.net.URI.create(image.getImageUrl()))
+                        .build();
+            }
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File missing");
         }
+        String contentType = image.getContentType();
+        if (contentType == null || contentType.isBlank()) {
+            contentType = "image/jpeg";
+        }
+        return fileResponse(path, contentType, image.getFileName());
+    }
+
+    private Path resolvePath(String filePath, String subfolder) {
+        if (filePath == null || filePath.isBlank()) {
+            return Path.of("missing");
+        }
+        Path path = Path.of(filePath).toAbsolutePath().normalize();
+        if (Files.exists(path)) return path;
+
+        Path relProject = Path.of(filePath).normalize();
+        if (Files.exists(relProject)) return relProject.toAbsolutePath();
+
+        Path inStorage = Path.of("storage", subfolder, Path.of(filePath).getFileName().toString()).toAbsolutePath().normalize();
+        if (Files.exists(inStorage)) return inStorage;
+
+        Path inSub = Path.of(subfolder, Path.of(filePath).getFileName().toString()).toAbsolutePath().normalize();
+        if (Files.exists(inSub)) return inSub;
+
+        return path;
+    }
+
+    private ResponseEntity<Resource> fileResponse(Path path, String contentType, String fileName) {
         Resource resource = new FileSystemResource(path);
         String disposition = ContentDisposition.inline()
                 .filename(fileName == null || fileName.isBlank() ? path.getFileName().toString() : fileName,
                         StandardCharsets.UTF_8)
                 .build()
                 .toString();
+        MediaType mediaType;
+        try {
+            mediaType = MediaType.parseMediaType(contentType);
+        } catch (Exception e) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
+                .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
                 .cacheControl(CacheControl.maxAge(java.time.Duration.ofDays(1)).cachePublic())
                 .body(resource);

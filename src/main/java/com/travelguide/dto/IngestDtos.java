@@ -21,7 +21,9 @@ public class IngestDtos {
             LocalDateTime startTime,
             LocalDateTime endTime,
             @Min(0) Integer listenedSeconds,
-            Boolean completed
+            Boolean completed,
+            String deviceType,
+            String osVersion
     ) {
     }
 
@@ -59,9 +61,23 @@ public class IngestDtos {
     public record ConsentRequest(boolean analyticsConsent) {
     }
 
+    public record DeviceRegisterRequest(
+            @NotBlank @Size(max = 64) String deviceId,
+            String deviceType,
+            String osVersion,
+            String appVersion,
+            String preferredLanguage,
+            Boolean analyticsConsent
+    ) {
+    }
+
     public record DeviceResponse(
             String deviceId,
             boolean analyticsConsent,
+            String deviceType,
+            String osVersion,
+            String appVersion,
+            String preferredLanguage,
             LocalDateTime createdAt,
             LocalDateTime lastSeenAt
     ) {

@@ -15,7 +15,9 @@ public class AnalyticsDtos {
             long qrScans,
             long uniqueDevices,
             Map<String, Long> triggerDistribution,
-            Map<String, Long> languageDistribution
+            Map<String, Long> languageDistribution,
+            Map<String, Long> platformDistribution,
+            Map<String, Long> osDistribution
     ) {
     }
 

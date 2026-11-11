@@ -31,12 +31,32 @@ export interface TranslationInput {
 }
 interface Translation extends TranslationInput { languageCode: string }
 
+export interface CoverageCell {
+  languageCode: string;
+  hasTranslation: boolean;
+  hasAudio: boolean;
+  hasTtsScript: boolean;
+}
+
+export interface CoverageRow {
+  poiId: number;
+  poiCode: string;
+  poiName: string;
+  translationCount: number;
+  audioCount: number;
+  languages: CoverageCell[];
+}
+
 export function listCmsPois(query: URLSearchParams, signal: AbortSignal) {
   return requestCms<{ content: CmsPoi[]; totalPages: number }>(`/pois?${query}`, { signal });
 }
 
 export function listCmsWards(signal: AbortSignal) {
   return requestCms<WardOption[]>('/wards', { signal });
+}
+
+export function getCoverageMatrix(signal: AbortSignal) {
+  return requestCms<CoverageRow[]>('/pois/coverage/all', { signal });
 }
 
 export async function getPoiEditor(id: string | undefined, signal: AbortSignal) {

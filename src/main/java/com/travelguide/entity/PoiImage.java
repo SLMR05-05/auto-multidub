@@ -36,6 +36,9 @@ public class PoiImage {
     @Column(nullable = false)
     private boolean coverImage = false;
 
+    @Column(name = "image_url", length = 600)
+    private String imageUrl;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -48,6 +51,8 @@ public class PoiImage {
     public void setFilePath(String filePath) { this.filePath = filePath; }
     public String getContentType() { return contentType; }
     public void setContentType(String contentType) { this.contentType = contentType; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public long getSizeBytes() { return sizeBytes; }
     public void setSizeBytes(long sizeBytes) { this.sizeBytes = sizeBytes; }
     public int getSortOrder() { return sortOrder; }

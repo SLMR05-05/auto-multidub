@@ -282,6 +282,7 @@ CREATE TABLE `qr_codes` (
     `is_active` BOOLEAN NOT NULL DEFAULT TRUE,
     `scan_count` BIGINT NOT NULL DEFAULT 0,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_qrcodes_code` (`code`),
     KEY `idx_qrcodes_poi` (`poi_id`),
@@ -350,36 +351,42 @@ CREATE TABLE `devices` (
 
 DROP TABLE IF EXISTS `playback_logs`;
 CREATE TABLE `playback_logs` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `id` VARCHAR(64) NOT NULL,
     `device_id` VARCHAR(64) NOT NULL,
     `user_id` BIGINT NULL COMMENT 'Tài khoản người dùng đăng nhập khi nghe',
     `poi_id` BIGINT NOT NULL,
     `trigger_type` ENUM('GPS', 'QR', 'MANUAL') NOT NULL,
-    `audio_mode` ENUM('PRERECORDED', 'TTS') NOT NULL,
+    `audio_mode` ENUM('PRERECORDED', 'TTS', 'LOCAL_AUDIO', 'STREAM_AUDIO', 'TEXT') NOT NULL,
     `language_code` VARCHAR(10) NOT NULL,
+    `qr_code` VARCHAR(32) NULL,
+    `qr_id` BIGINT NULL,
+    `bus_stop_id` BIGINT NULL,
     `start_time` DATETIME NOT NULL,
     `end_time` DATETIME NULL,
     `listened_seconds` INT NOT NULL DEFAULT 0,
     `is_completed` BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'PRD: >= 95% độ dài bài',
+    `valid_listen` BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'listened_seconds >= min_valid_listen_seconds',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_playback_poi` (`poi_id`, `created_at`),
     KEY `idx_playback_device` (`device_id`),
     KEY `idx_playback_user` (`user_id`),
     KEY `idx_playback_trigger` (`trigger_type`),
+    KEY `idx_playback_qr` (`qr_id`),
     CONSTRAINT `fk_playback_poi` FOREIGN KEY (`poi_id`) REFERENCES `pois` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_playback_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `tracking_sessions`;
 CREATE TABLE `tracking_sessions` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `id` VARCHAR(64) NOT NULL,
     `device_id` VARCHAR(64) NOT NULL,
     `user_id` BIGINT NULL,
     `started_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `ended_at` DATETIME NULL,
     `total_points` INT NOT NULL DEFAULT 0,
     `is_anonymized` BOOLEAN NOT NULL DEFAULT TRUE,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_tracking_device` (`device_id`, `started_at`),
     KEY `idx_tracking_user` (`user_id`),
@@ -389,12 +396,13 @@ CREATE TABLE `tracking_sessions` (
 DROP TABLE IF EXISTS `location_points`;
 CREATE TABLE `location_points` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
-    `session_id` BIGINT NOT NULL,
+    `session_id` VARCHAR(64) NOT NULL,
     `device_id` VARCHAR(64) NOT NULL,
     `latitude` DOUBLE NOT NULL,
     `longitude` DOUBLE NOT NULL,
     `accuracy_meters` DOUBLE NOT NULL,
     `recorded_at` DATETIME NOT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_points_session` (`session_id`),
     KEY `idx_points_time` (`recorded_at`),

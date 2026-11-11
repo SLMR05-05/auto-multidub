@@ -27,6 +27,18 @@ public class Device {
 
     private LocalDateTime consentUpdatedAt;
 
+    @Column(name = "device_type", length = 30)
+    private String deviceType = "WEB";
+
+    @Column(name = "os_version", length = 50)
+    private String osVersion;
+
+    @Column(name = "app_version", length = 20)
+    private String appVersion;
+
+    @Column(name = "preferred_language", length = 10)
+    private String preferredLanguage = "vi";
+
     public String getDeviceId() { return deviceId; }
     public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
     public boolean isAnalyticsConsent() { return analyticsConsent; }
@@ -36,4 +48,12 @@ public class Device {
     public void setLastSeenAt(LocalDateTime lastSeenAt) { this.lastSeenAt = lastSeenAt; }
     public LocalDateTime getConsentUpdatedAt() { return consentUpdatedAt; }
     public void setConsentUpdatedAt(LocalDateTime consentUpdatedAt) { this.consentUpdatedAt = consentUpdatedAt; }
+    public String getDeviceType() { return deviceType; }
+    public void setDeviceType(String deviceType) { this.deviceType = deviceType; }
+    public String getOsVersion() { return osVersion; }
+    public void setOsVersion(String osVersion) { this.osVersion = osVersion; }
+    public String getAppVersion() { return appVersion; }
+    public void setAppVersion(String appVersion) { this.appVersion = appVersion; }
+    public String getPreferredLanguage() { return preferredLanguage; }
+    public void setPreferredLanguage(String preferredLanguage) { this.preferredLanguage = preferredLanguage; }
 }
