@@ -13,7 +13,7 @@ public class AnalyticsDtos {
             long totalListens,
             long validListens,
             long qrScans,
-            long uniqueDevices,
+            long totalDevices,
             Map<String, Long> triggerDistribution,
             Map<String, Long> languageDistribution,
             Map<String, Long> platformDistribution,

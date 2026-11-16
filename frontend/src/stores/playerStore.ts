@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import type { Poi, AudioMode } from '@/types';
 import { apiUrl } from '@/services/api';
 
-function getDeviceId(): string {
+export function getDeviceId(): string {
   if (typeof window === 'undefined') return 'web-visitor-default';
   try {
     let id = localStorage.getItem('seminar.visitor.device_id');
@@ -19,20 +19,59 @@ function getDeviceId(): string {
 }
 
 export function getClientPlatform() {
-  if (typeof window === 'undefined') return { deviceType: 'WEB', osVersion: 'Web' };
+  if (typeof window === 'undefined') return { deviceType: 'WEB', osVersion: 'Web', appVersion: 'Web 1.0' };
   const ua = navigator.userAgent;
+
+  // 1. Phân loại dòng máy / thiết bị
+  let deviceName = 'PC/Laptop';
+  if (/iPhone/i.test(ua)) deviceName = 'iPhone';
+  else if (/iPad/i.test(ua)) deviceName = 'iPad';
+  else if (/Android/i.test(ua)) {
+    const match = ua.match(/;\s*([^;)]+)\s*Build/i);
+    deviceName = match && match[1] ? match[1].replace(/Build\/.*/i, '').trim() : (/Mobile/i.test(ua) ? 'Android Phone' : 'Android Tablet');
+  } else if (/Macintosh|Mac OS X/i.test(ua)) {
+    deviceName = 'MacBook/Mac';
+  } else if (/Windows/i.test(ua)) {
+    deviceName = 'Windows PC';
+  }
+
+  // 2. Hệ điều hành & phiên bản
   let os = 'Windows';
-  if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
-  else if (/Android/i.test(ua)) os = 'Android';
-  else if (/Windows/i.test(ua)) os = 'Windows';
-  else if (/Macintosh|Mac OS X/i.test(ua)) os = 'macOS';
-  else if (/Linux/i.test(ua)) os = 'Linux';
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    const v = ua.match(/OS (\d+[._]\d+)/i);
+    os = v ? `iOS ${v[1].replace('_', '.')}` : 'iOS';
+  } else if (/Android/i.test(ua)) {
+    const v = ua.match(/Android (\d+(\.\d+)?)/i);
+    os = v ? `Android ${v[1]}` : 'Android';
+  } else if (/Windows NT 10.0/i.test(ua)) {
+    os = 'Win 10/11';
+  } else if (/Macintosh/i.test(ua)) {
+    os = 'macOS';
+  } else if (/Linux/i.test(ua)) {
+    os = 'Linux';
+  }
+
+  // 3. Trình duyệt / Ứng dụng quét mã
+  let browser = 'Browser';
+  if (/Zalo/i.test(ua)) browser = 'Zalo App';
+  else if (/FBAN|FBAV/i.test(ua)) browser = 'Facebook';
+  else if (/TikTok/i.test(ua)) browser = 'TikTok';
+  else if (/Edg/i.test(ua)) browser = 'Edge';
+  else if (/SamsungBrowser/i.test(ua)) browser = 'Samsung Internet';
+  else if (/Chrome/i.test(ua)) browser = 'Chrome';
+  else if (/Safari/i.test(ua)) browser = 'Safari';
+  else if (/Firefox/i.test(ua)) browser = 'Firefox';
 
   const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (navigator as any).standalone;
   const isApp = Boolean(isStandalone || /AutoMultidubApp|wv/i.test(ua));
+
+  const osVersion = `${deviceName} (${os})`.slice(0, 48);
+  const appVersion = `${browser}${isApp ? ' [App]' : ''}`.slice(0, 20);
+
   return {
     deviceType: isApp ? 'APP' : 'WEB',
-    osVersion: os,
+    osVersion,
+    appVersion,
   };
 }
 

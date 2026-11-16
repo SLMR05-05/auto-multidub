@@ -501,12 +501,6 @@ export default function TourOsmMap({
           </button>
         </div>
       </div>
-
-      {/* Bottom Hint Bar */}
-      <div className="absolute bottom-2 left-3 pointer-events-none z-10 flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-medium">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-        <span>Click vào trạm để xem thông tin chi tiết & bán kính Geofence</span>
-      </div>
     </div>
   );
 }

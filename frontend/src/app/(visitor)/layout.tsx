@@ -3,6 +3,7 @@ import VisitorHeader from '@/components/visitor/VisitorHeader';
 import VisitorNavbar from '@/components/visitor/VisitorNavbar';
 import MiniPlayer from '@/components/visitor/MiniPlayer';
 import FloatingMic from '@/components/visitor/FloatingMic';
+import DevicePresenceTracker from '@/components/visitor/DevicePresenceTracker';
 
 export default function VisitorLayout({
   children,
@@ -11,6 +12,7 @@ export default function VisitorLayout({
 }) {
   return (
     <div className="flex flex-col min-h-screen bg-slate-100">
+      <DevicePresenceTracker />
       <VisitorHeader />
       <main className="flex-1"><VisitorCatalogProvider>{children}</VisitorCatalogProvider></main>
       <MiniPlayer />

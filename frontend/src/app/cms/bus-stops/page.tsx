@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { MOCK_WARDS, MOCK_BUS_STOPS, MOCK_POIS } from '@/services/mockData';
+import React, { useEffect, useState } from 'react';
+import { listCmsPois, type CmsPoi } from '@/services/cmsPois';
+import { listCmsWards, listCmsBusStops, createCmsBusStop, updateCmsBusStop, deleteCmsBusStop, type BusStopInput } from '@/services/cmsGeography';
 import { BusStop, Ward } from '@/types';
 import {
   Bus,
@@ -16,16 +17,17 @@ import {
   ExternalLink,
   Layers,
   X,
-  Save,
-  ToggleLeft,
-  ToggleRight
+  Save
 } from 'lucide-react';
 
 export default function CmsBusStopsPage() {
-  const [wards, setWards] = useState<Ward[]>(MOCK_WARDS);
-  const [busStops, setBusStops] = useState<BusStop[]>(MOCK_BUS_STOPS);
+  const [wards, setWards] = useState<Ward[]>([]);
+  const [busStops, setBusStops] = useState<BusStop[]>([]);
+  const [pois, setPois] = useState<CmsPoi[]>([]);
   const [selectedWardFilter, setSelectedWardFilter] = useState<number | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,7 +57,34 @@ export default function CmsBusStopsPage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // Filtered bus stops
+  async function loadData() {
+    setLoading(true);
+    setError('');
+    try {
+      const [wardData, stopData] = await Promise.all([listCmsWards(), listCmsBusStops()]);
+      setWards(wardData);
+      setBusStops(stopData);
+      // Load POIs for linked-POI display and ward counts.
+      const poiPages: CmsPoi[] = [];
+      let page = 0;
+      let totalPages = 1;
+      do {
+        const query = new URLSearchParams({ page: String(page), size: '100' });
+        const result = await listCmsPois(query, new AbortController().signal);
+        poiPages.push(...result.content);
+        totalPages = result.totalPages;
+        page += 1;
+      } while (page < totalPages);
+      setPois(poiPages);
+    } catch {
+      setError('Không tải được dữ liệu trạm dừng từ Backend.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadData(); }, []);
+
   const filteredBusStops = busStops.filter((stop) => {
     const matchesWard = selectedWardFilter === 'ALL' || stop.wardId === selectedWardFilter;
     const matchesSearch =
@@ -70,7 +99,7 @@ export default function CmsBusStopsPage() {
     setFormData({
       name: '',
       code: `BS-Q4-${(busStops.length + 1).toString().padStart(2, '0')}`,
-      wardId: 1,
+      wardId: wards[0]?.id ?? 1,
       latitude: 10.765,
       longitude: 106.703,
       address: 'Đường Đoàn Như Hài, Phường Khánh Hội, Quận 4',
@@ -84,7 +113,7 @@ export default function CmsBusStopsPage() {
     setFormData({
       name: stop.name,
       code: stop.code || '',
-      wardId: stop.wardId || 1,
+      wardId: stop.wardId || wards[0]?.id || 1,
       latitude: stop.latitude,
       longitude: stop.longitude,
       address: stop.address || '',
@@ -93,54 +122,47 @@ export default function CmsBusStopsPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim() || !formData.code.trim()) {
       alert('Vui lòng nhập tên trạm và mã trạm');
       return;
     }
-
-    if (editingStop) {
-      // Update
-      const updated = busStops.map((item) =>
-        item.id === editingStop.id
-          ? {
-              ...item,
-              ...formData
-            }
-          : item
-      );
-      setBusStops(updated);
-      showNotice(`Đã cập nhật trạm "${formData.name}" thành công!`);
-    } else {
-      // Create new
-      const newStop: BusStop = {
-        id: Date.now(),
-        ...formData
-      };
-      setBusStops([...busStops, newStop]);
-      showNotice(`Đã thêm trạm "${formData.name}" mới vào hệ thống!`);
+    const input: BusStopInput = {
+      code: formData.code.trim(),
+      name: formData.name.trim(),
+      wardId: formData.wardId || null,
+      latitude: formData.latitude,
+      longitude: formData.longitude,
+      address: formData.address.trim(),
+    };
+    try {
+      if (editingStop) {
+        await updateCmsBusStop(editingStop.id, input);
+        showNotice(`Đã cập nhật trạm "${formData.name}" thành công!`);
+      } else {
+        await createCmsBusStop(input);
+        showNotice(`Đã thêm trạm "${formData.name}" mới vào hệ thống!`);
+      }
+      setIsModalOpen(false);
+      await loadData();
+    } catch {
+      alert('Không lưu được trạm dừng. Kiểm tra quyền CMS và kết nối.');
     }
-
-    setIsModalOpen(false);
   };
 
-  const toggleStopActive = (id: number) => {
-    const updated = busStops.map((stop) =>
-      stop.id === id ? { ...stop, isActive: !stop.isActive } : stop
-    );
-    setBusStops(updated);
-    showNotice('Đã thay đổi trạng thái hoạt động của trạm.');
-  };
-
-  const deleteStop = (id: number) => {
-    const associatedPoi = MOCK_POIS.find((p) => p.busStopId === id);
+  const deleteStop = async (id: number) => {
+    const associatedPoi = pois.find((p) => p.busStopId === id);
     if (associatedPoi) {
       alert(`Không thể xóa trạm này vì đang được liên kết với điểm POI: "${associatedPoi.name}".`);
       return;
     }
-    if (confirm('Bạn có chắc chắn muốn xóa trạm dừng xe buýt này?')) {
-      setBusStops(busStops.filter((s) => s.id !== id));
+    if (!confirm('Bạn có chắc chắn muốn xóa trạm dừng xe buýt này?')) return;
+    try {
+      await deleteCmsBusStop(id);
       showNotice('Đã xóa trạm dừng xe buýt.');
+      await loadData();
+    } catch {
+      alert('Không xóa được trạm dừng. Kiểm tra quyền CMS và kết nối.');
     }
   };
 
@@ -151,10 +173,10 @@ export default function CmsBusStopsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Bus className="w-7 h-7 text-emerald-600" />
-            Quản lý Phường & Trạm dừng Xe buýt (Wards & Bus Stops)
+            Quản lý Phường & Trạm dừng Xe buýt 
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Đăng ký và quản lý các trạm đón trả khách du lịch, tọa độ GPS và liên kết với các điểm POI di tích Quận 4 (`FR-CMS-15`).
+            Đăng ký và quản lý các trạm đón trả khách du lịch, tọa độ GPS và liên kết với các điểm POI 
           </p>
         </div>
         <button
@@ -173,47 +195,52 @@ export default function CmsBusStopsPage() {
         </div>
       )}
 
-      {/* 3 Wards Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {wards.map((ward) => {
-          const count = busStops.filter((s) => s.wardId === ward.id).length;
-          const poiCount = MOCK_POIS.filter((p) => p.wardId === ward.id).length;
-          const isFilterActive = selectedWardFilter === ward.id;
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {loading && <p role="status">Đang tải dữ liệu từ Backend…</p>}
 
-          return (
-            <div
-              key={ward.id}
-              onClick={() => setSelectedWardFilter(isFilterActive ? 'ALL' : ward.id)}
-              className={`p-4 rounded-xl border transition cursor-pointer ${
-                isFilterActive
-                  ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-400'
-                  : 'bg-white border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                    <Building2 className="w-4 h-4" />
+      {/* 3 Wards Summary Grid */}
+      {!loading && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {wards.map((ward) => {
+            const count = busStops.filter((s) => s.wardId === ward.id).length;
+            const poiCount = pois.filter((p) => p.wardId === ward.id).length;
+            const isFilterActive = selectedWardFilter === ward.id;
+
+            return (
+              <div
+                key={ward.id}
+                onClick={() => setSelectedWardFilter(isFilterActive ? 'ALL' : ward.id)}
+                className={`p-4 rounded-xl border transition cursor-pointer ${
+                  isFilterActive
+                    ? 'bg-emerald-50/70 border-emerald-500 ring-2 ring-emerald-400'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">Phường {ward.name}</h3>
+                      <p className="text-xs text-slate-500">{ward.district}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm">Phường {ward.name}</h3>
-                    <p className="text-xs text-slate-500">{ward.district}</p>
-                  </div>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                    {count} trạm
+                  </span>
                 </div>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                  {count} trạm
-                </span>
+                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                  <span>Điểm di tích (POI): <strong className="text-emerald-700">{poiCount}</strong></span>
+                  <span className="text-[11px] text-emerald-600 font-medium">
+                    {isFilterActive ? 'Đang lọc' : 'Click để lọc'}
+                  </span>
+                </div>
               </div>
-              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                <span>Điểm di tích (POI): <strong className="text-emerald-700">{poiCount}</strong></span>
-                <span className="text-[11px] text-emerald-600 font-medium">
-                  {isFilterActive ? 'Đang lọc' : 'Click để lọc'}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Filter and Table Card */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -264,9 +291,9 @@ export default function CmsBusStopsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredBusStops.map((stop) => {
+              {!loading && filteredBusStops.map((stop) => {
                 const ward = wards.find((w) => w.id === stop.wardId);
-                const linkedPoi = MOCK_POIS.find((p) => p.busStopId === stop.id);
+                const linkedPoi = pois.find((p) => p.busStopId === stop.id);
 
                 return (
                   <tr key={stop.id} className="hover:bg-slate-50 transition">
@@ -299,24 +326,9 @@ export default function CmsBusStopsPage() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => toggleStopActive(stop.id)}
-                        className={`text-xs px-2.5 py-1 rounded-full font-bold flex items-center justify-center gap-1 mx-auto transition ${
-                          stop.isActive
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                        }`}
-                      >
-                        {stop.isActive ? (
-                          <>
-                            <ToggleRight className="w-4 h-4 text-emerald-600" /> Đang hoạt động
-                          </>
-                        ) : (
-                          <>
-                            <ToggleLeft className="w-4 h-4 text-rose-600" /> Tạm dừng
-                          </>
-                        )}
-                      </button>
+                      <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800">
+                        Đang hoạt động
+                      </span>
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -340,7 +352,7 @@ export default function CmsBusStopsPage() {
                 );
               })}
 
-              {filteredBusStops.length === 0 && (
+              {!loading && filteredBusStops.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-400 text-sm">
                     Không tìm thấy trạm dừng xe buýt nào phù hợp với bộ lọc tìm kiếm.
@@ -439,19 +451,6 @@ export default function CmsBusStopsPage() {
                     className="w-full text-sm font-mono px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
-                  id="isActiveCheck"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
-                />
-                <label htmlFor="isActiveCheck" className="text-sm font-medium text-slate-800">
-                  Kích hoạt trạm đón khách (Hiển thị cho du khách và hệ thống QR)
-                </label>
               </div>
             </div>
 

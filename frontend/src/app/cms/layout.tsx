@@ -28,7 +28,7 @@ export default function CmsLayout({
   }, [mounted, isLoginPage, hasSession, router]);
 
   if (isLoginPage) {
-    return <div className="min-h-screen bg-slate-900">{children}</div>;
+    return <div className="min-h-screen bg-slate-100">{children}</div>;
   }
 
   if (!hasSession) return <p role="status" className="p-6">Đang kiểm tra phiên CMS…</p>;

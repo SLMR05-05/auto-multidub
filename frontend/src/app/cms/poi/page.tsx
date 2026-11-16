@@ -72,7 +72,7 @@ export default function CmsPoiListPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <MapPin className="w-5 h-5 text-emerald-600" />
-            Quản lý Điểm thuyết minh (POI Registry)
+            Quản lý Điểm thuyết minh 
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Mạng lưới tọa độ GPS, bán kính kích hoạt Geofence và dữ liệu thuyết minh hiện trường

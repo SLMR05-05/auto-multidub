@@ -75,12 +75,13 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
-            @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}") String origins) {
+            @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173,https://*.vercel.app}") String origins) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.stream(origins.split(","))
+        List<String> list = Arrays.stream(origins.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
-                .toList());
+                .toList();
+        configuration.setAllowedOriginPatterns(list);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Content-Disposition", "X-Checksum-SHA256", "X-Data-Version"));

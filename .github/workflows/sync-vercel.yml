@@ -1,0 +1,54 @@
+
+name: Sync auto-multidub to Vercel Repository
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-vercel-repository
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync to Vercel repository
+        env:
+          SYNC_TOKEN: ${{ secrets.VERCEL_SYNC_TOKEN }}
+          TARGET_REPO: SLMR05-05/multilingual-travel-guide
+        run: |
+          if [ -z "$SYNC_TOKEN" ]; then
+            echo "::error::Missing VERCEL_SYNC_TOKEN"
+            exit 1
+          fi
+
+          # Authenticate without embedding token in remote URL
+          AUTH=$(printf 'x-access-token:%s' "$SYNC_TOKEN" | base64 -w0)
+
+          git remote add target \
+            "https://github.com/${TARGET_REPO}.git"
+
+          # Replace target main with source main
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $AUTH" \
+            push --force target HEAD:refs/heads/main
+
+          echo "Repository synchronized successfully!"

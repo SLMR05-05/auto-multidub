@@ -1,13 +1,32 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Languages, Download, Upload, CheckCircle2, AlertCircle, FileText, Volume2 } from 'lucide-react';
-import { getCoverageMatrix, type CoverageCell, type CoverageRow } from '@/services/cmsPois';
+import TranslationCellDialog, { type CoverageStatus } from '@/components/cms/TranslationCellDialog';
+import {
+  getCoverageMatrix,
+  getPoiTranslations,
+  type CoverageCell,
+  type CoverageRow,
+  type Translation,
+} from '@/services/cmsPois';
+
+interface SelectedCell {
+  row: CoverageRow;
+  cell: CoverageCell | undefined;
+  status: CoverageStatus;
+}
 
 export default function CmsTranslationMatrixPage() {
   const [rows, setRows] = useState<CoverageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selected, setSelected] = useState<SelectedCell | null>(null);
+  const [translation, setTranslation] = useState<Translation | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const translationsCache = useRef(new Map<number, Translation[]>());
+  const detailRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -29,12 +48,61 @@ export default function CmsTranslationMatrixPage() {
     return () => controller.abort();
   }, []);
 
+  useEffect(() => () => detailRequest.current?.abort(), []);
+
+  const closeDialog = useCallback(() => {
+    detailRequest.current?.abort();
+    detailRequest.current = null;
+    setSelected(null);
+    setTranslation(null);
+    setDetailLoading(false);
+    setDetailError('');
+  }, []);
+
+  function openCell(row: CoverageRow, cell: CoverageCell | undefined, status: CoverageStatus) {
+    detailRequest.current?.abort();
+    detailRequest.current = null;
+    setSelected({ row, cell, status });
+    setTranslation(null);
+    setDetailError('');
+
+    if (!cell) {
+      setDetailLoading(false);
+      return;
+    }
+
+    const cached = translationsCache.current.get(row.poiId);
+    if (cached) {
+      setTranslation(cached.find((item) => item.languageCode === cell.languageCode) ?? null);
+      setDetailLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    detailRequest.current = controller;
+    setDetailLoading(true);
+    getPoiTranslations(row.poiId, controller.signal)
+      .then((items) => {
+        if (controller.signal.aborted) return;
+        translationsCache.current.set(row.poiId, items);
+        setTranslation(items.find((item) => item.languageCode === cell.languageCode) ?? null);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setDetailError('Không tải được nội dung bản dịch. Kiểm tra phiên CMS hoặc kết nối backend.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDetailLoading(false);
+      });
+  }
+
   const languages = rows[0]?.languages.map((cell) => cell.languageCode) ?? [];
   const completeCount = rows.filter((row) =>
     row.languages.every((cell) => cell.hasTranslation && cell.hasTtsScript),
   ).length;
 
-  const getCellStatus = (cell: CoverageCell | undefined) => {
+  const getCellStatus = (cell: CoverageCell | undefined): { type: CoverageStatus; label: string; color: string } => {
     if (cell?.hasAudio) {
       return { type: 'AUDIO', label: 'Audio thu sẵn', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
     }
@@ -54,10 +122,11 @@ export default function CmsTranslationMatrixPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <Languages className="w-5 h-5 text-emerald-600" />
-            Ma trận độ phủ Ngôn ngữ & Bản dịch (FR-CMS-13)
+            Ma trận độ phủ Ngôn ngữ & Bản dịch 
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Tổng quan tình trạng biên dịch và audio của {rows.length} điểm POI trên {languages.length} ngôn ngữ đang kích hoạt
+            Tổng quan tình trạng biên dịch và audio của {rows.length} điểm POI trên {languages.length} ngôn ngữ đang kích hoạt.
+            Nhấn vào từng ô để nghe audio hoặc xem nội dung chi tiết.
           </p>
         </div>
 
@@ -153,13 +222,17 @@ export default function CmsTranslationMatrixPage() {
                     const status = getCellStatus(cells.get(code));
                     return (
                       <td key={code} className="py-3.5 px-3 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border ${status.color}`}
+                        <button
+                          type="button"
+                          onClick={() => openCell(row, cells.get(code), status.type)}
+                          title="Nhấn để xem chi tiết"
+                          aria-label={`${row.poiName} - ${code} - ${status.label}. Nhấn để xem chi tiết`}
+                          className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold transition hover:-translate-y-0.5 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/60 ${status.color}`}
                         >
                           {status.type === 'AUDIO' && <Volume2 className="w-3 h-3" />}
                           {status.type === 'TTS' && <FileText className="w-3 h-3" />}
                           {status.label}
-                        </span>
+                        </button>
                       </td>
                     );
                   })}
@@ -169,6 +242,18 @@ export default function CmsTranslationMatrixPage() {
           </tbody>
         </table>
       </div>
+
+      {selected && (
+        <TranslationCellDialog
+          row={selected.row}
+          cell={selected.cell}
+          status={selected.status}
+          translation={translation}
+          loading={detailLoading}
+          error={detailError}
+          onClose={closeDialog}
+        />
+      )}
     </div>
   );
 }

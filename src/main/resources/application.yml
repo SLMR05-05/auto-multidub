@@ -52,7 +52,7 @@ app:
   qr:
     base-url: ${APP_QR_BASE_URL:http://localhost:8080/q/}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,https://*.vercel.app}
   seed-admin:
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}

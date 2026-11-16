@@ -1,21 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Users, Shield, History, Plus, Lock, CheckCircle, Ban } from 'lucide-react';
 import { AppUser } from '@/types';
+import { listCmsUsers } from '@/services/cmsUsers';
 
 export default function CmsUsersAuditPage() {
-  const [users, setUsers] = useState<AppUser[]>([
-    { id: 1, email: 'admin@example.com', fullName: 'System Admin', role: 'ADMIN', isActive: true },
-    { id: 2, email: 'editor.hcm@example.com', fullName: 'Nguyễn Văn Editor', role: 'EDITOR', isActive: true },
-    { id: 3, email: 'analyst.travel@example.com', fullName: 'Trần Thị Analyst', role: 'ANALYST', isActive: true },
-  ]);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const auditLogs = [
-    { id: 101, user: 'admin@example.com', action: 'PUBLISH', entity: 'SYSTEM', detail: 'Tăng DATA_VERSION từ v1 lên v2', time: '10 phút trước' },
-    { id: 102, user: 'editor.hcm@example.com', action: 'UPDATE', entity: 'POI_BEN_NHA_RONG', detail: 'Cập nhật kịch bản TTS bản dịch tiếng Anh', time: '1 giờ trước' },
-    { id: 103, user: 'editor.hcm@example.com', action: 'CREATE', entity: 'QR_CODE_BS02', detail: 'Tạo mã QR dán trạm 02 Bến Nhà Rồng', time: '3 giờ trước' },
-  ];
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    listCmsUsers(controller.signal)
+      .then(setUsers)
+      .catch(() => {
+        if (!controller.signal.aborted) setError('Không tải được danh sách người dùng từ Backend.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const auditLogs: { id: number; user: string; action: string; entity: string; detail: string; time: string }[] = [];
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -29,6 +38,9 @@ export default function CmsUsersAuditPage() {
           Phân quyền RBAC (Admin, Editor, Analyst) và theo dõi nhật ký bất biến Audit Log
         </p>
       </div>
+
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {loading && <p role="status">Đang tải người dùng…</p>}
 
       {/* Grid: Left = Users list, Right = Immutable Audit Log */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

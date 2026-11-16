@@ -6,12 +6,14 @@ import com.travelguide.repository.DeviceRepository;
 import com.travelguide.repository.LocationPointRepository;
 import com.travelguide.repository.PlaybackLogRepository;
 import com.travelguide.repository.TrackingSessionRepository;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class DeviceService {
@@ -117,6 +119,63 @@ public class DeviceService {
         }
 
         return new DeleteDeviceResponse(deviceId, playbackCount, sessionCount, pointCount);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminDeviceSummary listAdminDevices(String search, String type, String os) {
+        List<Device> all = devices.findAll(Sort.by(Sort.Direction.DESC, "lastSeenAt"));
+        LocalDateTime fifteenMinutesAgo = LocalDateTime.now().minusMinutes(15);
+
+        List<AdminDeviceItem> items = all.stream()
+                .filter(d -> {
+                    if (search != null && !search.isBlank()) {
+                        String s = search.trim().toLowerCase();
+                        boolean matchId = d.getDeviceId() != null && d.getDeviceId().toLowerCase().contains(s);
+                        boolean matchOs = d.getOsVersion() != null && d.getOsVersion().toLowerCase().contains(s);
+                        boolean matchLang = d.getPreferredLanguage() != null && d.getPreferredLanguage().toLowerCase().contains(s);
+                        if (!matchId && !matchOs && !matchLang) return false;
+                    }
+                    if (type != null && !type.isBlank() && !"ALL".equalsIgnoreCase(type)) {
+                        String t = d.getDeviceType() == null ? "WEB" : d.getDeviceType();
+                        if (!t.equalsIgnoreCase(type.trim())) return false;
+                    }
+                    if (os != null && !os.isBlank() && !"ALL".equalsIgnoreCase(os)) {
+                        String deviceOs = d.getOsVersion() == null ? "" : d.getOsVersion().toLowerCase();
+                        if (!deviceOs.contains(os.trim().toLowerCase())) return false;
+                    }
+                    return true;
+                })
+                .map(d -> {
+                    long playbacks = playbackLogs.countByDeviceId(d.getDeviceId());
+                    long sessionCount = sessions.countByDeviceId(d.getDeviceId());
+                    boolean online = d.getLastSeenAt() != null && d.getLastSeenAt().isAfter(fifteenMinutesAgo);
+                    return new AdminDeviceItem(
+                            d.getDeviceId(),
+                            d.getDeviceType() == null ? "WEB" : d.getDeviceType(),
+                            d.getOsVersion(),
+                            d.getAppVersion(),
+                            d.getPreferredLanguage(),
+                            d.isAnalyticsConsent(),
+                            playbacks,
+                            sessionCount,
+                            d.getCreatedAt(),
+                            d.getLastSeenAt(),
+                            online
+                    );
+                })
+                .toList();
+
+        long onlineCount = all.stream()
+                .filter(d -> d.getLastSeenAt() != null && d.getLastSeenAt().isAfter(fifteenMinutesAgo))
+                .count();
+        long webCount = all.stream()
+                .filter(d -> !"APP".equalsIgnoreCase(d.getDeviceType()) && !"MOBILE_APP".equalsIgnoreCase(d.getDeviceType()))
+                .count();
+        long appCount = all.stream()
+                .filter(d -> "APP".equalsIgnoreCase(d.getDeviceType()) || "MOBILE_APP".equalsIgnoreCase(d.getDeviceType()))
+                .count();
+
+        return new AdminDeviceSummary(all.size(), onlineCount, webCount, appCount, items);
     }
 
     public DeviceResponse toResponse(Device device) {

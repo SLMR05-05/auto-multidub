@@ -29,13 +29,26 @@ export interface TranslationInput {
   description: string;
   ttsScript: string;
 }
-interface Translation extends TranslationInput { languageCode: string }
+export interface Translation extends TranslationInput { languageCode: string }
+
+export interface CmsPoiAudio {
+  id: number;
+  languageCode: string;
+  fileName: string;
+  contentType: string;
+  format: string;
+  sizeBytes: number;
+  durationSeconds: number;
+  checksumSha256: string | null;
+  streamUrl: string;
+}
 
 export interface CoverageCell {
   languageCode: string;
   hasTranslation: boolean;
   hasAudio: boolean;
   hasTtsScript: boolean;
+  audio: CmsPoiAudio | null;
 }
 
 export interface CoverageRow {
@@ -57,6 +70,10 @@ export function listCmsWards(signal: AbortSignal) {
 
 export function getCoverageMatrix(signal: AbortSignal) {
   return requestCms<CoverageRow[]>('/pois/coverage/all', { signal });
+}
+
+export function getPoiTranslations(id: number, signal: AbortSignal) {
+  return requestCms<Translation[]>(`/pois/${id}/translations`, { signal });
 }
 
 export async function getPoiEditor(id: string | undefined, signal: AbortSignal) {

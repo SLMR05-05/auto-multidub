@@ -107,6 +107,8 @@ export interface QrCode {
   scanCount: number;
   poi?: Poi;
   busStop?: BusStop;
+  url?: string;
+  createdAt?: string;
 }
 
 export interface OfflinePackage {

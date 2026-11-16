@@ -252,12 +252,13 @@ public class PoiService {
         List<CoverageCell> cells = LanguageCatalog.codes().stream()
                 .map(lang -> {
                     PoiTranslation translation = translationMap.get(lang);
+                    PoiAudio audio = audioMap.get(lang);
                     boolean hasTranslation = translation != null
                             && translation.getName() != null && !translation.getName().isBlank();
-                    boolean hasAudio = audioMap.containsKey(lang);
                     boolean hasTts = translation != null && translation.getTtsScript() != null
                             && !translation.getTtsScript().isBlank();
-                    return new CoverageCell(lang, hasTranslation, hasAudio, hasTts);
+                    return new CoverageCell(lang, hasTranslation, audio != null, hasTts,
+                            audio == null ? null : toAudioResponse(audio));
                 })
                 .toList();
         return new CoverageResponse(poi.getId(), poi.getCode(), poi.getName(),

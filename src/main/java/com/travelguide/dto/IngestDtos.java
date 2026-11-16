@@ -122,4 +122,28 @@ public class IngestDtos {
             int acceptedPoints
     ) {
     }
+
+    public record AdminDeviceItem(
+            String deviceId,
+            String deviceType,
+            String osVersion,
+            String appVersion,
+            String preferredLanguage,
+            boolean analyticsConsent,
+            long totalPlaybacks,
+            long totalSessions,
+            LocalDateTime createdAt,
+            LocalDateTime lastSeenAt,
+            boolean online
+    ) {
+    }
+
+    public record AdminDeviceSummary(
+            long totalDevices,
+            long onlineDevices,
+            long webDevices,
+            long appDevices,
+            List<AdminDeviceItem> items
+    ) {
+    }
 }

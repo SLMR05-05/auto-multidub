@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Language } from '@/types';
-import { MOCK_LANGUAGES } from '@/services/mockData';
+import { listCmsLanguages } from '@/services/cmsLanguages';
 
 interface LanguageState {
   currentLang: string; // 'vi', 'en', ...
@@ -9,11 +9,20 @@ interface LanguageState {
   toggleLanguageActive: (id: number) => void;
   addLanguage: (lang: Omit<Language, 'id'>) => void;
   getActiveLanguages: () => Language[];
+  loadLanguages: () => Promise<void>;
 }
 
 export const useLanguageStore = create<LanguageState>((set, get) => ({
   currentLang: 'vi',
-  languages: MOCK_LANGUAGES,
+  languages: [],
+  loadLanguages: async () => {
+    try {
+      const languages = await listCmsLanguages();
+      set({ languages });
+    } catch {
+      // Keep the UI usable even if the language endpoint is unavailable.
+    }
+  },
 
   setLanguage: (code: string) => {
     const found = get().languages.find((l) => l.code === code && l.isActive);
@@ -51,3 +60,7 @@ export const useLanguageStore = create<LanguageState>((set, get) => ({
     return get().languages.filter((l) => l.isActive);
   },
 }));
+
+if (typeof window !== 'undefined') {
+  void useLanguageStore.getState().loadLanguages();
+}

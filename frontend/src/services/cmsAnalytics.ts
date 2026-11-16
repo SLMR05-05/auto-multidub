@@ -7,7 +7,7 @@ interface Dashboard {
   totalListens: number;
   validListens: number;
   qrScans: number;
-  uniqueDevices: number;
+  totalDevices: number;
   triggerDistribution?: Record<string, number>;
   languageDistribution?: Record<string, number>;
   platformDistribution?: Record<string, number>;

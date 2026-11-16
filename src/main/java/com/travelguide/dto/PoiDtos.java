@@ -132,7 +132,8 @@ public class PoiDtos {
             String languageCode,
             boolean hasTranslation,
             boolean hasAudio,
-            boolean hasTtsScript
+            boolean hasTtsScript,
+            AudioResponse audio
     ) {
     }
 

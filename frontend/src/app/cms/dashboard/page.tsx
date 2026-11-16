@@ -61,7 +61,7 @@ export default function CmsDashboard() {
     { label: 'Tổng lượt nghe', value: summary.totalListens, icon: Headphones, color: 'text-blue-600 bg-blue-50' },
     { label: 'Lượt nghe hợp lệ', value: summary.validListens, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
     { label: 'Lượt quét QR', value: summary.qrScans, icon: QrCode, color: 'text-amber-600 bg-amber-50' },
-    { label: 'Tổng thiết bị', value: summary.uniqueDevices, icon: Smartphone, color: 'text-purple-600 bg-purple-50' },
+    { label: 'Tổng thiết bị', value: summary.totalDevices, icon: Smartphone, color: 'text-purple-600 bg-purple-50' },
   ];
 
   // Nền tảng (Web vs Mobile App)
@@ -101,13 +101,6 @@ export default function CmsDashboard() {
             Khoảng thời gian: <span className="font-medium text-slate-700">{summary.from}</span> – <span className="font-medium text-slate-700">{summary.to}</span>
           </p>
         </div>
-        <Link
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition"
-          href="/cms/analytics/heatmap"
-        >
-          <Flame className="h-4 w-4" />
-          Xem bản đồ nhiệt
-        </Link>
       </header>
 
       {/* KPI Cards */}

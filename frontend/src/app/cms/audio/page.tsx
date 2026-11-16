@@ -148,7 +148,7 @@ export default function CmsAudioPage() {
       <div>
         <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
           <Volume2 className="w-5 h-5 text-emerald-600" />
-          Kho Audio Thu Sẵn & Thử Nghiệm TTS (FR-CMS-11, FR-CMS-12)
+          Kho Audio Thu Sẵn & Thử Nghiệm TTS
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">
           Quản lý tập tin âm thanh hướng dẫn viên và kiểm tra giọng đọc nhân tạo đa ngôn ngữ

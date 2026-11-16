@@ -45,7 +45,7 @@ export default function CmsLanguagesPage() {
             Quản lý Danh mục Ngôn ngữ Hệ thống
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Quản lý các ngôn ngữ hỗ trợ thuyết minh và trợ lý Voice AI (Khớp PRD FR-CMS-08 & CSDL động)
+            Quản lý các ngôn ngữ hỗ trợ thuyết minh và trợ lý Voice AI 
           </p>
         </div>
 

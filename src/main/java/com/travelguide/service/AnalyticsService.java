@@ -92,15 +92,14 @@ public class AnalyticsService {
         platforms.putIfAbsent("Web (Trình duyệt)", 0L);
         platforms.putIfAbsent("App (Ứng dụng di động)", 0L);
 
-        long uniqueDevices = logs.stream().map(PlaybackLog::getDeviceId).distinct().count();
-        if (uniqueDevices == 0 && deviceRepository != null) {
-            uniqueDevices = deviceRepository.count();
-        }
+        // "Tổng thiết bị" comes from the device registry, matching the
+        // "Thiết bị truy cập" screen. It is not derived from playback activity.
+        long totalDevices = deviceRepository == null ? 0L : deviceRepository.count();
         long qrScans = logs.stream().filter(log -> log.getTriggerType() == TriggerType.QR).count();
         long sessionCount = sessions.countByStartedAtBetween(range.fromTime(), range.toTime());
 
         return new DashboardResponse(range.from(), range.to(), sessionCount,
-                logs.size(), valid.size(), qrScans, uniqueDevices, triggers, languages, platforms, osList);
+                logs.size(), valid.size(), qrScans, totalDevices, triggers, languages, platforms, osList);
     }
 
     @Transactional(readOnly = true)
@@ -250,7 +249,7 @@ public class AnalyticsService {
         csv.append("total_listens,").append(dashboard.totalListens()).append('\n');
         csv.append("valid_listens,").append(dashboard.validListens()).append('\n');
         csv.append("qr_scans,").append(dashboard.qrScans()).append('\n');
-        csv.append("unique_devices,").append(dashboard.uniqueDevices()).append("\n\n");
+        csv.append("total_devices,").append(dashboard.totalDevices()).append("\n\n");
         csv.append("poi_id,poi_code,poi_name,valid_listens,avg_listened_seconds,completion_rate\n");
         for (TopPoiItem item : top.items()) {
             csv.append(item.poiId()).append(',')
