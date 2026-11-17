@@ -1,0 +1,128 @@
+{
+  "version": "0.6",
+  "generator": "openstreetmap-cgimap 2.1.1 (2120982 spike-06.openstreetmap.org)",
+  "copyright": "OpenStreetMap and contributors",
+  "attribution": "http://www.openstreetmap.org/copyright",
+  "license": "http://opendatacommons.org/licenses/odbl/1-0/",
+  "elements": [
+    {
+      "type": "node",
+      "id": 1777960128,
+      "lat": 10.7622581,
+      "lon": 106.6982716,
+      "timestamp": "2019-09-13T16:47:45Z",
+      "version": 3,
+      "changeset": 74447044,
+      "user": "_Poliwrath_",
+      "uid": 8759140
+    },
+    {
+      "type": "node",
+      "id": 1777960130,
+      "lat": 10.7623054,
+      "lon": 106.6982203,
+      "timestamp": "2019-04-08T13:13:13Z",
+      "version": 2,
+      "changeset": 69006473,
+      "user": "TuanIfan",
+      "uid": 625303
+    },
+    {
+      "type": "node",
+      "id": 1777960133,
+      "lat": 10.7623526,
+      "lon": 106.6982642,
+      "timestamp": "2019-04-08T13:13:13Z",
+      "version": 2,
+      "changeset": 69006473,
+      "user": "TuanIfan",
+      "uid": 625303
+    },
+    {
+      "type": "node",
+      "id": 1777960198,
+      "lat": 10.7623285,
+      "lon": 106.6985914,
+      "timestamp": "2019-09-11T22:33:33Z",
+      "version": 3,
+      "changeset": 74373566,
+      "user": "_Poliwrath_",
+      "uid": 8759140
+    },
+    {
+      "type": "node",
+      "id": 1777960199,
+      "lat": 10.7623038,
+      "lon": 106.6983156,
+      "timestamp": "2019-09-13T16:55:51Z",
+      "version": 3,
+      "changeset": 74447369,
+      "user": "_Poliwrath_",
+      "uid": 8759140
+    },
+    {
+      "type": "node",
+      "id": 1777960200,
+      "lat": 10.7624509,
+      "lon": 106.6984603,
+      "timestamp": "2019-04-08T13:13:13Z",
+      "version": 2,
+      "changeset": 69006473,
+      "user": "TuanIfan",
+      "uid": 625303
+    },
+    {
+      "type": "node",
+      "id": 1777960224,
+      "lat": 10.7621358,
+      "lon": 106.698405,
+      "timestamp": "2019-04-08T13:13:13Z",
+      "version": 2,
+      "changeset": 69006473,
+      "user": "TuanIfan",
+      "uid": 625303
+    },
+    {
+      "type": "node",
+      "id": 1793489524,
+      "lat": 10.7622588,
+      "lon": 106.6982723,
+      "timestamp": "2019-04-08T13:13:13Z",
+      "version": 2,
+      "changeset": 69006473,
+      "user": "TuanIfan",
+      "uid": 625303
+    },
+    {
+      "type": "way",
+      "id": 166344439,
+      "timestamp": "2025-06-17T07:39:59Z",
+      "version": 8,
+      "changeset": 167725467,
+      "user": "Tommybara",
+      "uid": 12198525,
+      "nodes": [
+        1777960200,
+        1777960198,
+        1777960224,
+        1777960128,
+        1793489524,
+        1777960130,
+        1777960133,
+        1777960199,
+        1777960200
+      ],
+      "tags": {
+        "amenity": "place_of_worship",
+        "building": "yes",
+        "denomination": "roman_catholic",
+        "name": "Nhà thờ Vĩnh Hội",
+        "name:en": "Vinh Hoi Catholic Church",
+        "name:id": "Gereja Katolik Vinh Hoi",
+        "name:ru": "церковь Винь Хой",
+        "name:zh": "永会天主教堂",
+        "religion": "christian"
+      }
+    }
+  ]
+}

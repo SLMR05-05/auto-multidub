@@ -1,9 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { Poi } from '@/types';
-import { MapPin, Navigation, Volume2, Info, Compass, Layers } from 'lucide-react';
-import Link from 'next/link';
+import { usePlayerStore } from '@/stores/playerStore';
+import { GeofenceEngine, GeofenceEvent } from '@/utils/geofenceEngine';
+import type { VisitorLeafletMapProps } from './VisitorLeafletMap';
+
+// Dynamically import Leaflet with SSR disabled
+const VisitorLeafletMap = dynamic<VisitorLeafletMapProps>(
+  () => import('./VisitorLeafletMap'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[calc(100vh-4rem)] md:h-full bg-slate-900 flex flex-col items-center justify-center text-white space-y-3">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs text-slate-400">Đang khởi tạo bản đồ số Quận 4…</p>
+      </div>
+    ),
+  }
+);
 
 interface MapViewProps {
   pois: Poi[];
@@ -13,156 +29,224 @@ interface MapViewProps {
 }
 
 export default function MapView({ pois, onSelectPoi, selectedPoi, onPlayPoi }: MapViewProps) {
-  // Tọa độ người dùng mặc định tại Quận 4 (gần Khánh Hội/Nhà Rồng)
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number }>({
-    lat: 10.7670,
-    lng: 106.7050,
-  });
+  const { playPoi, autoPlayEnabled, isPlaying, isCooldown } = usePlayerStore();
 
-  // Tìm POI gần nhất
-  const nearestPoi = pois[0];
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<'INITIALIZING' | 'ACTIVE' | 'DENIED' | 'UNAVAILABLE' | 'TIMEOUT'>('INITIALIZING');
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | undefined>(undefined);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // References for Geofencing Engine and GPS Watcher
+  const engineRef = useRef<GeofenceEngine | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+
+  const autoPlayRef = useRef(autoPlayEnabled);
+  autoPlayRef.current = autoPlayEnabled;
+
+  const poisRef = useRef(pois);
+  poisRef.current = pois;
+
+  // Initialize Geofencing Engine
+  useEffect(() => {
+    const engine = new GeofenceEngine({
+      accuracyThresholdMeters: 50,
+      debounceSeconds: 3,
+      hysteresisFactor: 1.2,
+    });
+    engineRef.current = engine;
+
+    return () => {
+      engine.reset();
+      engineRef.current = null;
+    };
+  }, []);
+
+  // Update Engine targets whenever published POIs change
+  useEffect(() => {
+    if (!engineRef.current) return;
+    const publishedPois = pois.filter((p) => p.status !== 'ARCHIVED' && !p.isDeleted);
+    engineRef.current.setTargets(
+      publishedPois.map((p) => ({
+        id: p.id,
+        name: p.name,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        radiusMeters: p.radiusMeters || 50,
+        priority: p.priority ?? 3,
+      }))
+    );
+  }, [pois]);
+
+  // Audio Context Unlocker on explicit user gesture
+  const handleUnlockAudio = useCallback(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          ctx.resume().then(() => ctx.close());
+        }
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+      }
+      setAudioUnlocked(true);
+      setToastMessage('Đã mở khóa tự động phát âm thanh khi đến gần di tích!');
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch {
+      setAudioUnlocked(true);
+    }
+  }, []);
+
+  // Handle Geofence Events
+  const handleGeofenceEvents = useCallback(
+    (events: GeofenceEvent[]) => {
+      if (!autoPlayRef.current) return;
+
+      const enterEvents = events.filter((e) => e.type === 'ENTER');
+      if (enterEvents.length === 0) return;
+
+      // Filter out POIs currently on cooldown
+      const eligibleEvents = enterEvents.filter((e) => !isCooldown(e.target.id));
+      if (eligibleEvents.length === 0) return;
+
+      // Sort: 1st by priority descending (5 down to 1), 2nd by distance ascending
+      eligibleEvents.sort((a, b) => {
+        if (b.target.priority !== a.target.priority) {
+          return b.target.priority - a.target.priority;
+        }
+        return a.distance - b.distance;
+      });
+
+      const selectedEvent = eligibleEvents[0];
+      const targetPoi = poisRef.current.find((p) => p.id === selectedEvent.target.id);
+
+      if (!targetPoi) return;
+
+      // Do not disrupt audio if another POI is actively playing
+      if (isPlayingRef.current) {
+        console.log(
+          `[Geofence] POI ${targetPoi.name} entered, but audio is currently playing. Skipping disruption.`
+        );
+        return;
+      }
+
+      // Trigger automatic audio narration
+      try {
+        playPoi(targetPoi, false, 'GPS');
+        setToastMessage(`Đã vào vùng: ${targetPoi.name}. Đang tự động thuyết minh…`);
+        setTimeout(() => setToastMessage(null), 4000);
+      } catch (err) {
+        console.warn('[Geofence] Failed to auto-play audio:', err);
+      }
+    },
+    [isCooldown, playPoi]
+  );
+
+  // Subscribe Geofence Engine
+  useEffect(() => {
+    if (!engineRef.current) return;
+    const unsubscribe = engineRef.current.subscribe((event) => {
+      handleGeofenceEvents([event]);
+    });
+    return unsubscribe;
+  }, [handleGeofenceEvents]);
+
+  // Real-time GPS Tracking with navigator.geolocation.watchPosition
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      setGpsStatus('UNAVAILABLE');
+      return;
+    }
+
+    setGpsStatus('INITIALIZING');
+
+    const handleSuccess = (position: GeolocationPosition) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      const coords = { lat: latitude, lng: longitude, accuracy };
+      setUserLocation(coords);
+      setGpsAccuracy(accuracy);
+      setGpsStatus('ACTIVE');
+
+      // Feed location into Geofencing Engine
+      if (engineRef.current) {
+        engineRef.current.processLocation({
+          latitude,
+          longitude,
+          accuracy,
+        });
+      }
+    };
+
+    const handleError = (error: GeolocationPositionError) => {
+      console.warn('[GPS Watcher Error]', error.code, error.message);
+      if (error.code === error.PERMISSION_DENIED) {
+        setGpsStatus('DENIED');
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        setGpsStatus('UNAVAILABLE');
+      } else if (error.code === error.TIMEOUT) {
+        setGpsStatus('TIMEOUT');
+      }
+    };
+
+    const watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, {
+      enableHighAccuracy: true,
+      maximumAge: 5000,
+      timeout: 10000,
+    });
+
+    watchIdRef.current = watchId;
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleRecenter = useCallback(() => {
+    // If permission was previously denied or unavailable, attempt re-query
+    if (navigator.geolocation && gpsStatus !== 'ACTIVE') {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          });
+          setGpsAccuracy(pos.coords.accuracy);
+          setGpsStatus('ACTIVE');
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+  }, [gpsStatus]);
 
   return (
-    <div className="relative w-full h-[calc(100vh-4rem)] md:h-full bg-slate-900 overflow-hidden select-none">
-      {/* Giả lập Bản đồ Vệ tinh / Đường phố SVG tương tác cao */}
-      <div className="absolute inset-0 bg-[#0f172a] bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px]">
-        {/* Bản đồ Kênh Bến Nghé & Sông Sài Gòn */}
-        <svg className="w-full h-full opacity-60 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-          {/* Đường sông/kênh */}
-          <path
-            d="M 0,220 C 150,210 280,180 450,240 C 600,290 750,200 900,180"
-            fill="none"
-            stroke="#0284c7"
-            strokeWidth="38"
-            strokeLinecap="round"
-          />
-          {/* Cầu bắc qua */}
-          <line x1="280" y1="160" x2="300" y2="230" stroke="#94a3b8" strokeWidth="8" />
-          <line x1="420" y1="210" x2="440" y2="280" stroke="#94a3b8" strokeWidth="8" />
-        </svg>
+    <div className="relative w-full h-full">
+      <VisitorLeafletMap
+        pois={pois}
+        selectedPoi={selectedPoi}
+        onSelectPoi={onSelectPoi}
+        onPlayPoi={onPlayPoi}
+        userLocation={userLocation}
+        gpsStatus={gpsStatus}
+        gpsAccuracy={gpsAccuracy}
+        onRecenter={handleRecenter}
+        audioUnlocked={audioUnlocked}
+        onUnlockAudio={handleUnlockAudio}
+      />
 
-        {/* Các vòng rào Geofence của các POI */}
-        {pois.map((poi, idx) => {
-          // Tính tọa độ offset tương đối trên màn hình mô phỏng
-          const x = 35 + ((poi.longitude - 106.703) * 8000) % 65;
-          const y = 30 + ((10.770 - poi.latitude) * 7000) % 55;
-          const isSelected = selectedPoi?.id === poi.id;
-
-          return (
-            <div
-              key={poi.id}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all cursor-pointer group"
-              style={{ left: `${x}%`, top: `${y}%` }}
-              onClick={() => onSelectPoi(poi)}
-            >
-              {/* Geofence Radar Circle */}
-              <div
-                className={`rounded-full border transition-all duration-500 flex items-center justify-center ${
-                  isSelected
-                    ? 'w-32 h-32 bg-emerald-500/20 border-emerald-400 border-2 animate-pulse'
-                    : 'w-20 h-20 bg-emerald-500/10 border-emerald-500/30 group-hover:border-emerald-400'
-                }`}
-              >
-                {/* Marker Pin */}
-                <div
-                  className={`w-9 h-9 rounded-full shadow-lg flex items-center justify-center transition-transform ${
-                    isSelected
-                      ? 'bg-emerald-500 text-white scale-125 ring-4 ring-emerald-300/40'
-                      : 'bg-white text-emerald-700 hover:scale-110'
-                  }`}
-                >
-                  <MapPin className="w-5 h-5 fill-current" />
-                </div>
-              </div>
-
-              {/* Tên POI Tooltip */}
-              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900/90 text-white text-[11px] font-medium px-2 py-0.5 rounded-md shadow backdrop-blur-sm pointer-events-none border border-slate-700">
-                {poi.name.split('-')[0].trim()}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* User GPS Pulse */}
-        <div
-          className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20"
-          style={{ left: '48%', top: '52%' }}
-        >
-          <div className="relative flex items-center justify-center">
-            <span className="animate-ping absolute inline-flex h-8 w-8 rounded-full bg-sky-400 opacity-60"></span>
-            <div className="w-5 h-5 rounded-full bg-sky-500 border-2 border-white shadow-md flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-white"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Top Floating Controls */}
-      <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700 text-white rounded-xl px-3 py-1.5 shadow pointer-events-auto flex items-center gap-2 text-xs">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></div>
-          <span className="font-medium text-emerald-400">GPS Sẵn sàng</span>
-          <span className="text-slate-400">| Q.4, TP.HCM</span>
-        </div>
-
-        <button
-          onClick={() => setUserLocation({ lat: 10.7670, lng: 106.7050 })}
-          className="w-10 h-10 rounded-xl bg-white text-slate-800 shadow-md border border-slate-200 flex items-center justify-center pointer-events-auto hover:bg-slate-50 active:scale-95 transition-all"
-          title="Về vị trí của tôi"
-        >
-          <Navigation className="w-5 h-5 text-emerald-600 fill-emerald-100" />
-        </button>
-      </div>
-
-      {/* Bottom Sheet Modal when selecting a POI */}
-      {selectedPoi && (
-        <div className="md:hidden absolute bottom-4 left-3 right-3 z-30 max-w-md mx-auto bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 animate-in slide-in-from-bottom duration-300">
-          <div className="flex items-start gap-3">
-            {selectedPoi.images && selectedPoi.images[0] ? (
-              <img
-                src={selectedPoi.images[0].imageUrl}
-                alt={selectedPoi.name}
-                className="w-20 h-20 rounded-xl object-cover shrink-0 shadow-sm"
-              />
-            ) : (
-              <div className="w-20 h-20 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                <MapPin className="w-8 h-8 text-slate-400" />
-              </div>
-            )}
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                  {selectedPoi.ward?.name || 'Quận 4'}
-                </span>
-                <span className="text-xs text-slate-500">Cách bạn ~45m</span>
-              </div>
-              <h3 className="font-bold text-sm text-slate-900 line-clamp-1 leading-snug">
-                {selectedPoi.name}
-              </h3>
-              <p className="text-xs text-slate-600 line-clamp-2 mt-1">
-                {selectedPoi.translations?.[0]?.description || 'Chưa có bài giới thiệu.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-            <button
-              onClick={() => onPlayPoi(selectedPoi)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 text-white font-semibold text-xs shadow hover:bg-emerald-700 active:scale-98 transition-all"
-            >
-              <Volume2 className="w-4 h-4" />
-              Nghe thuyết minh ngay
-            </button>
-
-            <Link
-              href={`/poi/${selectedPoi.id}`}
-              className="flex items-center justify-center gap-1 py-2.5 px-3 rounded-xl bg-slate-100 text-slate-800 font-semibold text-xs hover:bg-slate-200 transition-colors"
-            >
-              <Info className="w-4 h-4" />
-              Chi tiết
-            </Link>
-          </div>
+      {/* Real-time Notification Toast for Geofencing & Audio */}
+      {toastMessage && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 max-w-sm w-11/12 bg-slate-900/95 border border-emerald-500/80 text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0 animate-ping"></div>
+          <span className="font-medium text-emerald-100">{toastMessage}</span>
         </div>
       )}
     </div>

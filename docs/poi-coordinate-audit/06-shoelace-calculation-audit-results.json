@@ -1,0 +1,91 @@
+{
+  "timestamp": "2026-11-17T02:52:50.729Z",
+  "method": "Planar area-weighted centroid using local equirectangular metric projection",
+  "sphereRadiusMeters": 6371000,
+  "results": [
+    {
+      "wayId": "166344439",
+      "code": "POI_NHA_THO_VINH_HOI",
+      "name": "Nhà thờ Vĩnh Hội",
+      "anchorLat": 10.76228,
+      "anchorLon": 106.6984,
+      "rawCentroidLat": 10.762294323820383,
+      "rawCentroidLon": 106.698417957431,
+      "roundedCentroidLat": 10.762294,
+      "roundedCentroidLon": 106.698418,
+      "areaSqM": 642.7778820936501,
+      "distRawMeters": 2.5268339398703272,
+      "distRoundMeters": 2.5079378305334856
+    },
+    {
+      "wayId": "187949842",
+      "code": "POI_DINH_VINH_HOI",
+      "name": "Đình Vĩnh Hội",
+      "anchorLat": 10.75956,
+      "anchorLon": 106.696,
+      "rawCentroidLat": 10.759557937668815,
+      "rawCentroidLon": 106.69600099145799,
+      "roundedCentroidLat": 10.759558,
+      "roundedCentroidLon": 106.696001,
+      "areaSqM": 382.69452060421577,
+      "distRawMeters": 0.2536107249253925,
+      "distRoundMeters": 0.24777133152953368
+    },
+    {
+      "wayId": "286297477",
+      "code": "POI_CAU_MONG",
+      "name": "Cầu Mống",
+      "anchorLat": 10.76804,
+      "anchorLon": 106.7037,
+      "rawCentroidLat": 10.768116272010097,
+      "rawCentroidLon": 106.70367457666154,
+      "roundedCentroidLat": 10.768116,
+      "roundedCentroidLon": 106.703675,
+      "areaSqM": 944.8296137238843,
+      "distRawMeters": 8.92418344942156,
+      "distRoundMeters": 8.881115303014237
+    },
+    {
+      "wayId": "682412572",
+      "code": "POI_CONG_VIEN_KHANH_HOI",
+      "name": "Công viên Khánh Hội",
+      "anchorLat": 10.75775,
+      "anchorLon": 106.69805,
+      "rawCentroidLat": 10.757757656239505,
+      "rawCentroidLon": 106.6978253287663,
+      "roundedCentroidLat": 10.757758,
+      "roundedCentroidLon": 106.697825,
+      "areaSqM": 52211.84638242242,
+      "distRawMeters": 24.558001814603575,
+      "distRoundMeters": 24.595247736821623
+    },
+    {
+      "wayId": "808033616",
+      "code": "POI_NHA_RONG",
+      "name": "Bến Nhà Rồng",
+      "anchorLat": 10.76828,
+      "anchorLon": 106.70664,
+      "rawCentroidLat": 10.768315729309728,
+      "rawCentroidLon": 106.70656037533496,
+      "roundedCentroidLat": 10.768316,
+      "roundedCentroidLon": 106.70656,
+      "areaSqM": 14295.266691712526,
+      "distRawMeters": 9.562342713401327,
+      "distRoundMeters": 9.61214798941945
+    },
+    {
+      "wayId": "1538947028",
+      "code": "POI_CHO_XOM_CHIEU",
+      "name": "Chợ Xóm Chiếu",
+      "anchorLat": 10.76351,
+      "anchorLon": 106.7061,
+      "rawCentroidLat": 10.763508568208888,
+      "rawCentroidLon": 106.70609682756628,
+      "roundedCentroidLat": 10.763509,
+      "roundedCentroidLon": 106.706097,
+      "areaSqM": 4863.55720868804,
+      "distRawMeters": 0.38137332436266264,
+      "distRoundMeters": 0.34606642517984226
+    }
+  ]
+}
