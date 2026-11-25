@@ -9,6 +9,7 @@ import com.travelguide.repository.*;
 import com.travelguide.util.CodeUtils;
 import com.travelguide.util.GeoUtils;
 import com.travelguide.util.LanguageCatalog;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -36,6 +37,7 @@ public class PoiService {
     private final BusStopRepository busStops;
     private final DataVersionService versions;
     private final AuditService audit;
+    private final ApplicationEventPublisher events;
 
     public PoiService(PoiRepository pois,
                       PoiTranslationRepository translations,
@@ -47,7 +49,7 @@ public class PoiService {
                       WardRepository wards,
                       BusStopRepository busStops,
                       DataVersionService versions,
-                      AuditService audit) {
+                      AuditService audit, ApplicationEventPublisher events) {
         this.pois = pois;
         this.translations = translations;
         this.audios = audios;
@@ -59,6 +61,7 @@ public class PoiService {
         this.busStops = busStops;
         this.versions = versions;
         this.audit = audit;
+        this.events = events;
     }
 
     // ------------------------------------------------------------------
@@ -88,6 +91,52 @@ public class PoiService {
     @Transactional(readOnly = true)
     public AdminResponse adminGet(Long id) {
         return toAdmin(find(id));
+    }
+
+    @Transactional(readOnly = true)
+    public EditorResponse editor(Long id) {
+        return new EditorResponse(adminGet(id), listTranslations(id),
+                audios.findByPoiIdOrderByLanguageCodeAsc(id).stream().map(this::toAudioResponse).toList(),
+                images.findByPoiIdOrderBySortOrderAsc(id).stream().map(this::toImageResponse).toList(),
+                tourPois.findByPoiId(id).stream()
+                        .map(link -> new TourRef(link.getTour().getId(), link.getTour().getCode(),
+                                link.getTour().getName(), link.getOrderIndex())).toList());
+    }
+
+    @Transactional
+    public EditorResponse saveEditor(Long id, EditorRequest request) {
+        Long poiId = id == null ? create(request.poi()).id() : update(id, request.poi()).id();
+        for (Map.Entry<String, TranslationRequest> entry : request.translations().entrySet()) {
+            upsertTranslation(poiId, entry.getKey(), entry.getValue());
+        }
+        return editor(poiId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GeofenceResponse> geofences() {
+        return pois.findByStatusInOrderByNameAsc(List.of(PoiStatus.DRAFT, PoiStatus.READY, PoiStatus.PUBLISHED))
+                .stream().map(p -> new GeofenceResponse(p.getId(), p.getName(), p.getLatitude(),
+                        p.getLongitude(), p.getRadiusMeters(), p.getPriority(), p.getStatus().name())).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PublishIssue> publishCheck(Long id) {
+        return validateForPublish(find(id));
+    }
+
+    @Transactional
+    public ReadinessResult markReady(Long id) {
+        Poi poi = find(id);
+        List<PublishIssue> issues = validateForPublish(poi);
+        if (poi.getStatus() == PoiStatus.PUBLISHED) {
+            issues.add(issue(poi, "POI đã xuất bản; hãy dùng Lưu và xuất bản để cập nhật."));
+        }
+        if (issues.isEmpty()) {
+            poi.setStatus(PoiStatus.READY);
+            pois.save(poi);
+            audit.record("READY", "POI", id, null, toAdmin(poi));
+        }
+        return new ReadinessResult(toAdmin(poi), issues);
     }
 
     @Transactional
@@ -161,41 +210,41 @@ public class PoiService {
 
     @Transactional
     public PublishResult publish(Long id) {
-        Poi poi = find(id);
-        List<PublishIssue> issues = validateForPublish(poi);
-        if (!issues.isEmpty()) {
-            return new PublishResult(versions.current(), 0, issues);
-        }
-        long version = versions.next();
-        poi.setStatus(PoiStatus.PUBLISHED);
-        poi.setPreviouslyPublished(true);
-        poi.setVersion(version);
-        pois.save(poi);
-        audit.record("PUBLISH", "POI", id, null, Map.of("version", version, "status", "PUBLISHED"));
-        return new PublishResult(version, 1, List.of());
+        return publishSelected(List.of(id));
     }
 
     /**
-     * Re-validates every published POI and bumps the global data version once.
-     * This is the CMS "Xuất bản" action.
+     * The default catalog action includes Ready POIs and existing published content.
+     * Incomplete drafts are included only when explicitly selected by the editor.
      */
     @Transactional
     public PublishResult publishAll() {
-        List<Poi> published = pois.findByStatusInOrderByNameAsc(List.of(PoiStatus.PUBLISHED));
+        return publishSelected(pois.findByStatusInOrderByNameAsc(List.of(PoiStatus.READY, PoiStatus.PUBLISHED))
+                .stream().map(Poi::getId).toList());
+    }
+
+    @Transactional
+    public PublishResult publishSelected(List<Long> ids) {
+        List<Poi> selected = ids.stream().distinct().map(this::find).toList();
         List<PublishIssue> issues = new ArrayList<>();
-        for (Poi poi : published) {
+        for (Poi poi : selected) {
             issues.addAll(validateForPublish(poi));
         }
-        if (!issues.isEmpty()) {
+        if (!issues.isEmpty() || selected.isEmpty()) {
             return new PublishResult(versions.current(), 0, issues);
         }
         long version = versions.next();
-        for (Poi poi : published) {
+        for (Poi poi : selected) {
+            poi.setStatus(PoiStatus.PUBLISHED);
+            poi.setPreviouslyPublished(true);
             poi.setVersion(version);
+            audit.record("PUBLISH", "POI", poi.getId(), null,
+                    Map.of("version", version, "status", "PUBLISHED"));
         }
-        pois.saveAll(published);
-        audit.record("PUBLISH_ALL", "SYSTEM", null, null, Map.of("version", version, "poiCount", published.size()));
-        return new PublishResult(version, published.size(), List.of());
+        pois.saveAll(selected);
+        audit.record("PUBLISH_ALL", "SYSTEM", null, null, Map.of("version", version, "poiCount", selected.size()));
+        events.publishEvent(new CatalogPublished(version));
+        return new PublishResult(version, selected.size(), List.of());
     }
 
     @Transactional(readOnly = true)
@@ -552,27 +601,30 @@ public class PoiService {
 
     private List<PublishIssue> validateForPublish(Poi poi) {
         List<PublishIssue> issues = new ArrayList<>();
+        if (poi.getStatus() == PoiStatus.ARCHIVED) {
+            issues.add(issue(poi, "POI đã lưu trữ, không thể xuất bản."));
+        }
         PoiTranslation vi = translations.findByPoiIdAndLanguageCode(poi.getId(), "vi").orElse(null);
         if (vi == null || vi.getName() == null || vi.getName().isBlank()) {
-            issues.add(issue(poi, "Missing Vietnamese name translation"));
+            issues.add(issue(poi, "Thiếu tiêu đề tiếng Việt."));
         } else {
             if (vi.getDescription() == null || vi.getDescription().isBlank()) {
-                issues.add(issue(poi, "Missing Vietnamese description"));
+                issues.add(issue(poi, "Thiếu mô tả tiếng Việt."));
             }
             boolean hasAudio = audios.existsByPoiIdAndLanguageCode(poi.getId(), "vi");
             boolean hasScript = vi.getTtsScript() != null && !vi.getTtsScript().isBlank();
             if (!hasAudio && !hasScript) {
-                issues.add(issue(poi, "Need Vietnamese audio or a Vietnamese TTS script"));
+                issues.add(issue(poi, "Cần audio tiếng Việt hoặc kịch bản TTS tiếng Việt."));
             }
         }
         if (poi.getRadiusMeters() < 20 || poi.getRadiusMeters() > 300) {
-            issues.add(issue(poi, "Geofence radius must be between 20 and 300 meters"));
+            issues.add(issue(poi, "Bán kính Geofence phải từ 20 đến 300 mét."));
         }
         if (poi.getPriority() < 1 || poi.getPriority() > 5) {
-            issues.add(issue(poi, "Priority must be between 1 and 5"));
+            issues.add(issue(poi, "Mức ưu tiên phải từ 1 đến 5."));
         }
         if (!GeoUtils.isValidLatitude(poi.getLatitude()) || !GeoUtils.isValidLongitude(poi.getLongitude())) {
-            issues.add(issue(poi, "Invalid coordinates"));
+            issues.add(issue(poi, "Tọa độ không hợp lệ."));
         }
         return issues;
     }
@@ -582,6 +634,9 @@ public class PoiService {
     }
 
     private void touchIfPublished(Poi poi) {
+        if (poi.getStatus() == PoiStatus.READY) {
+            poi.setStatus(PoiStatus.DRAFT);
+        }
         if (poi.getStatus() == PoiStatus.PUBLISHED) {
             poi.setVersion(versions.next());
         }
@@ -591,11 +646,13 @@ public class PoiService {
         String base = requested != null && !requested.isBlank()
                 ? requested.trim()
                 : CodeUtils.slugify(name);
+        base = base.substring(0, Math.min(base.length(), 120));
         if (!pois.existsByCode(base)) {
             return base;
         }
         for (int i = 0; i < 5; i++) {
-            String candidate = base + "-" + CodeUtils.randomBase62(8).toLowerCase(Locale.ROOT);
+            String candidate = base.substring(0, Math.min(base.length(), 111))
+                    + "-" + CodeUtils.randomBase62(8).toLowerCase(Locale.ROOT);
             if (!pois.existsByCode(candidate)) {
                 return candidate;
             }

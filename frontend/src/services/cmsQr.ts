@@ -1,5 +1,6 @@
 import type { QrCode } from '@/types';
 import { requestCms, readCmsSession } from './cms';
+import { apiUrl } from './api';
 
 interface QrResponse {
   id: number;
@@ -58,7 +59,7 @@ export function deleteCmsQrCode(id: number) {
 
 export async function fetchCmsQrImageBlob(id: number, format: 'png' | 'svg' = 'png', size = 512): Promise<Blob> {
   const session = readCmsSession();
-  const res = await fetch(`/api/v1/admin/qr-codes/${id}/image?format=${format}&size=${size}`, {
+  const res = await fetch(apiUrl(`/api/v1/admin/qr-codes/${id}/image?format=${format}&size=${size}`), {
     headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {},
   });
   if (!res.ok) throw new Error('Không tải được ảnh mã QR từ máy chủ.');
@@ -79,7 +80,7 @@ export async function downloadCmsQrImage(id: number, code: string, format: 'png'
 
 export async function downloadCmsQrPrint(id: number, code: string) {
   const session = readCmsSession();
-  const res = await fetch(`/api/v1/admin/qr-codes/${id}/print`, {
+  const res = await fetch(apiUrl(`/api/v1/admin/qr-codes/${id}/print`), {
     headers: session?.token ? { Authorization: `Bearer ${session.token}` } : {},
   });
   if (!res.ok) throw new Error('Không tải được file in từ máy chủ.');

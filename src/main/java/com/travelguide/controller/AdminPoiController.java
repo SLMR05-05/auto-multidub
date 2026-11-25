@@ -43,6 +43,36 @@ public class AdminPoiController {
         return pois.create(request);
     }
 
+    @PostMapping("/editor")
+    public EditorResponse createEditor(@Valid @RequestBody EditorRequest request) {
+        return pois.saveEditor(null, request);
+    }
+
+    @GetMapping("/{id}/editor")
+    public EditorResponse editor(@PathVariable Long id) {
+        return pois.editor(id);
+    }
+
+    @PutMapping("/{id}/editor")
+    public EditorResponse updateEditor(@PathVariable Long id, @Valid @RequestBody EditorRequest request) {
+        return pois.saveEditor(id, request);
+    }
+
+    @GetMapping("/geofences")
+    public List<GeofenceResponse> geofences() {
+        return pois.geofences();
+    }
+
+    @GetMapping("/{id}/publish-check")
+    public List<PublishIssue> publishCheck(@PathVariable Long id) {
+        return pois.publishCheck(id);
+    }
+
+    @PostMapping("/{id}/ready")
+    public ReadinessResult ready(@PathVariable Long id) {
+        return pois.markReady(id);
+    }
+
     @GetMapping("/{id}")
     public AdminResponse get(@PathVariable Long id) {
         return pois.adminGet(id);

@@ -63,6 +63,10 @@ export function setCmsTourPois(id: number, poiIds: number[]) {
   }).then(adaptTour);
 }
 
+export function addCmsTourPoi(id: number, poiId: number) {
+  return requestCms<TourResponse>(`/tours/${id}/pois/${poiId}`, { method: 'PUT' }).then(adaptTour);
+}
+
 export function publishCmsTour(id: number) {
   return requestCms<TourResponse>(`/tours/${id}/publish`, { method: 'POST' }).then(adaptTour);
 }
@@ -70,4 +74,3 @@ export function publishCmsTour(id: number) {
 export function archiveCmsTour(id: number) {
   return requestCms<{ message: string }>(`/tours/${id}`, { method: 'DELETE' });
 }
-

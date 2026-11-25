@@ -33,7 +33,7 @@ public class MediaService {
 
     private static final long MAX_AUDIO_BYTES = 20L * 1024 * 1024;
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
-    private static final Set<String> AUDIO_EXTENSIONS = Set.of("mp3", "m4a", "aac", "wav");
+    private static final Set<String> AUDIO_EXTENSIONS = Set.of("mp3", "m4a", "aac");
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
 
     private final PoiRepository pois;
@@ -216,6 +216,10 @@ public class MediaService {
     }
 
     private void touchPublished(Poi poi) {
+        if (poi.getStatus() == PoiStatus.READY) {
+            poi.setStatus(PoiStatus.DRAFT);
+            pois.save(poi);
+        }
         if (poi.getStatus() == PoiStatus.PUBLISHED) {
             poi.setVersion(versions.next());
             pois.save(poi);

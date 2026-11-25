@@ -231,6 +231,11 @@ MySQL expose ở host port `3307`, API ở `8080`. Volume `audio_data`, `image_d
 |---|---|---|---|
 | GET | `/api/v1/admin/pois` | ADMIN/EDITOR | Tìm kiếm, lọc, phân trang POI |
 | POST | `/api/v1/admin/pois` | ADMIN/EDITOR | Tạo POI (DRAFT) |
+| POST | `/api/v1/admin/pois/editor` | ADMIN/EDITOR | Tạo nháp và bản dịch trong một transaction |
+| GET/PUT | `/api/v1/admin/pois/{id}/editor` | ADMIN/EDITOR | Tải đầy đủ editor / lưu thông tin và các bản dịch |
+| GET | `/api/v1/admin/pois/geofences` | ADMIN/EDITOR | Tọa độ và vùng kích hoạt để xem chồng lấn |
+| GET | `/api/v1/admin/pois/{id}/publish-check` | ADMIN/EDITOR | Kiểm tra điều kiện xuất bản |
+| POST | `/api/v1/admin/pois/{id}/ready` | ADMIN/EDITOR | Kiểm tra và chuyển sang READY |
 | GET/PUT/DELETE | `/api/v1/admin/pois/{id}` | ADMIN/EDITOR | Xem/sửa/archive POI |
 | POST | `/api/v1/admin/pois/{id}/publish` | ADMIN/EDITOR | Publish một POI |
 | GET | `/api/v1/admin/pois/{id}/translations` | ADMIN/EDITOR | Danh sách bản dịch |
@@ -248,7 +253,7 @@ MySQL expose ở host port `3307`, API ở `8080`. Volume `audio_data`, `image_d
 
 | Method | URL | Quyền | Ý nghĩa |
 |---|---|---|---|
-| POST | `/api/v1/admin/publish` | ADMIN/EDITOR | Validate toàn bộ POI publish + tăng version |
+| POST | `/api/v1/admin/publish` | ADMIN/EDITOR | Validate và xuất bản `{ "poiIds": [...] }` tại một version; không body = READY + PUBLISHED |
 | GET | `/api/v1/admin/settings` | ADMIN/EDITOR | Xem settings |
 | PUT | `/api/v1/admin/settings/{key}` | ADMIN | Cập nhật setting (không cho sửa `data_version`) |
 | GET | `/api/v1/admin/translations/export.csv` | ADMIN/EDITOR | Export ma trận bản dịch |
@@ -261,6 +266,7 @@ MySQL expose ở host port `3307`, API ở `8080`. Volume `audio_data`, `image_d
 | GET/POST | `/api/v1/admin/tours` | ADMIN/EDITOR | Danh sách/tạo Tour |
 | GET/PUT/DELETE | `/api/v1/admin/tours/{id}` | ADMIN/EDITOR | Xem/sửa/archive Tour |
 | PUT | `/api/v1/admin/tours/{id}/pois` | ADMIN/EDITOR | Gán danh sách POI theo thứ tự |
+| PUT | `/api/v1/admin/tours/{id}/pois/{poiId}` | ADMIN/EDITOR | Thêm POI vào cuối Tour, giữ các điểm hiện có |
 | POST | `/api/v1/admin/tours/{id}/publish` | ADMIN/EDITOR | Publish Tour |
 | GET/POST | `/api/v1/admin/wards` | ADMIN/EDITOR | Phường/khu vực |
 | PUT/DELETE | `/api/v1/admin/wards/{id}` | ADMIN/EDITOR | Sửa/xóa phường |
@@ -275,6 +281,7 @@ MySQL expose ở host port `3307`, API ở `8080`. Volume `audio_data`, `image_d
 | GET/POST | `/api/v1/admin/offline-packages` | ADMIN/EDITOR | Danh sách/tạo gói offline |
 | GET | `/api/v1/admin/offline-packages/{id}/download` | ADMIN/EDITOR | Tải ZIP |
 | DELETE | `/api/v1/admin/offline-packages/{id}` | ADMIN/EDITOR | Xóa gói |
+| POST | `/api/v1/admin/offline-packages/{id}/retry` | ADMIN/EDITOR | Đưa gói FAILED vào hàng đợi tạo lại |
 
 ### 8.5 Analytics, audit, users
 

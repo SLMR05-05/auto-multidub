@@ -42,6 +42,11 @@ public class AdminPackageController {
         return packages.create(request);
     }
 
+    @PostMapping("/{id}/retry")
+    public Response retry(@PathVariable Long id) {
+        return packages.retry(id);
+    }
+
     @DeleteMapping("/{id}")
     public MessageResponse delete(@PathVariable Long id) {
         packages.delete(id);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { archiveCmsPoi, listCmsPois, listCmsWards, type CmsPoi } from '@/services/cmsPois';
+import { archiveCmsPoi, listCmsPois, listCmsWards, poiStatusLabels, type CmsPoi } from '@/services/cmsPois';
 import { MapPin, Plus, Search, Edit3, Trash2, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
 
 export default function CmsPoiListPage() {
@@ -10,6 +10,7 @@ export default function CmsPoiListPage() {
   const [wards, setWards] = useState<Awaited<ReturnType<typeof listCmsWards>>>([]);
   const [search, setSearch] = useState('');
   const [wardFilter, setWardFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [revision, setRevision] = useState(0);
@@ -32,6 +33,7 @@ export default function CmsPoiListPage() {
     const query = new URLSearchParams({ page: String(page), size: '20' });
     if (search.trim()) query.set('search', search.trim());
     if (wardFilter) query.set('wardId', wardFilter);
+    if (statusFilter) query.set('status', statusFilter);
     listCmsPois(query, controller.signal)
       .then((data) => {
         if (controller.signal.aborted) return;
@@ -49,7 +51,7 @@ export default function CmsPoiListPage() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [search, wardFilter, page, revision]);
+  }, [search, wardFilter, statusFilter, page, revision]);
 
   async function handleDelete(id: number) {
     if (archiving !== null || !window.confirm('Lưu trữ điểm thuyết minh này?')) return;
@@ -102,6 +104,12 @@ export default function CmsPoiListPage() {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          <select aria-label="Lọc trạng thái POI" value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+            <option value="">Mọi trạng thái</option>
+            {Object.entries(poiStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
           <span className="text-xs text-slate-500 shrink-0">Lọc theo phường:</span>
           <select
             value={wardFilter}
@@ -162,7 +170,7 @@ export default function CmsPoiListPage() {
                 </td>
                 <td className="py-3 px-4">
                   <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-[10px]">
-                    {poi.status}
+                    {poiStatusLabels[poi.status]}
                   </span>
                 </td>
                 <td className="py-3 px-4 text-right">

@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Volume2, Upload, Play, Pause, Sparkles, FileAudio, CheckCircle } from 'lucide-react';
-import { listCmsPois, type CmsPoi } from '@/services/cmsPois';
-import { useLanguageStore } from '@/stores/languageStore';
+import { listCmsPois, getCmsPoiEditor, uploadPoiAudio, type CmsPoi, type CmsPoiAudio } from '@/services/cmsPois';
+import { listCmsLanguages } from '@/services/cmsLanguages';
+import { apiUrl } from '@/services/api';
+import { mediaFileError } from '@/utils/poiEditor';
+import LocalMediaPreview from '@/components/cms/LocalMediaPreview';
+import type { Language } from '@/types';
 
 const ttsSamples: Record<string, string> = {
   vi: 'Chào mừng quý khách đến với Thành phố Hồ Chí Minh. Mời quý khách cùng khám phá các di tích lịch sử.',
@@ -17,11 +21,55 @@ const ttsSamples: Record<string, string> = {
 };
 
 export default function CmsAudioPage() {
-  const { getActiveLanguages } = useLanguageStore();
-  const languages = getActiveLanguages();
+  const [languages, setLanguages] = useState<Language[]>([]);
 
   const [poiList, setPoiList] = useState<CmsPoi[] | null>(null);
   const [poiLoadFailed, setPoiLoadFailed] = useState(false);
+  const [uploadPoiId, setUploadPoiId] = useState('');
+  const [uploadLanguage, setUploadLanguage] = useState('vi');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPending, setUploadPending] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadNotice, setUploadNotice] = useState('');
+  const [uploadedAudio, setUploadedAudio] = useState<CmsPoiAudio | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    listCmsLanguages(controller.signal).then(setLanguages).catch(() => {
+      if (!controller.signal.aborted) setUploadError('Không tải được danh sách ngôn ngữ.');
+    });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setUploadFile(null); setUploadedAudio(null); setUploadNotice(''); setUploadError('');
+    if (uploadPoiId) getCmsPoiEditor(Number(uploadPoiId), controller.signal).then((data) => {
+      if (!controller.signal.aborted) setUploadedAudio(data.audios.find((audio) => audio.languageCode === uploadLanguage) ?? null);
+    }).catch((failure) => {
+      if (!controller.signal.aborted) setUploadError(failure instanceof Error ? failure.message : 'Không tải được audio.');
+    });
+    return () => controller.abort();
+  }, [uploadPoiId, uploadLanguage]);
+
+  function chooseUpload(file?: File) {
+    if (!file || uploadPending) return;
+    const error = mediaFileError(file, 'audio');
+    setUploadError(error ?? '');
+    if (!error) setUploadFile(file);
+  }
+
+  async function upload() {
+    if (!uploadFile || !uploadPoiId || uploadPending) return;
+    setUploadPending(true); setUploadError(''); setUploadNotice('');
+    try {
+      setUploadedAudio(await uploadPoiAudio(Number(uploadPoiId), uploadLanguage, uploadFile));
+      setUploadFile(null);
+      setUploadNotice('Đã tải audio và gắn vào POI thành công.');
+    } catch (failure) {
+      setUploadError(failure instanceof Error ? failure.message : 'Không upload được audio.');
+    } finally { setUploadPending(false); }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -38,7 +86,11 @@ export default function CmsAudioPage() {
         page += 1;
       } while (page < totalPages && !controller.signal.aborted);
 
-      if (!controller.signal.aborted) setPoiList(pois);
+      if (!controller.signal.aborted) {
+        const active = pois.filter((poi) => poi.status !== 'ARCHIVED');
+        setPoiList(active);
+        setUploadPoiId(String(active[0]?.id ?? ''));
+      }
     }
 
     loadPois().catch(() => {
@@ -170,7 +222,8 @@ export default function CmsAudioPage() {
           <div className="space-y-3">
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">Gắn cho điểm POI</label>
-              <select disabled={!poiList?.length} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none">
+              <select aria-label="POI nhận audio" value={uploadPoiId} onChange={(e) => setUploadPoiId(e.target.value)}
+                disabled={uploadPending || !poiList?.length} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none">
                 {!poiList?.length && (
                   <option value="">
                     {poiLoadFailed ? 'Không tải được danh sách POI' : poiList ? 'Chưa có điểm POI' : 'Đang tải danh sách POI…'}
@@ -186,7 +239,8 @@ export default function CmsAudioPage() {
 
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">Ngôn ngữ của bản thu âm</label>
-              <select className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none">
+              <select aria-label="Ngôn ngữ audio" value={uploadLanguage} onChange={(e) => setUploadLanguage(e.target.value)}
+                disabled={uploadPending} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none">
                 {languages.map((l) => (
                   <option key={l.code} value={l.code}>
                     {l.nativeName} ({l.code})
@@ -196,18 +250,29 @@ export default function CmsAudioPage() {
             </div>
 
             {/* Dropzone */}
-            <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 flex flex-col items-center justify-center text-center hover:border-emerald-500 transition-colors bg-slate-50/50 cursor-pointer">
+            <label htmlFor="cms-audio-file" onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); chooseUpload(e.dataTransfer.files[0]); }}
+              className="border-2 border-dashed border-slate-300 rounded-2xl p-6 flex flex-col items-center justify-center text-center hover:border-emerald-500 transition-colors bg-slate-50/50 cursor-pointer">
               <Upload className="w-8 h-8 text-slate-400 mb-2" />
               <p className="text-xs font-bold text-slate-700">Kéo thả file âm thanh hoặc bấm để chọn</p>
-              <p className="text-[11px] text-slate-400 mt-1">Định dạng hỗ trợ: MP3, M4A, AAC, WAV (≤ 20 MB)</p>
-            </div>
+              <p className="text-[11px] text-slate-400 mt-1">Định dạng hỗ trợ: MP3, M4A, AAC (≤ 20 MB)</p>
+              <input id="cms-audio-file" type="file" accept=".mp3,.m4a,.aac" disabled={uploadPending} className="sr-only"
+                onChange={(e) => { chooseUpload(e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
+            {uploadFile && <div><p className="text-sm">{uploadFile.name}</p><LocalMediaPreview file={uploadFile} kind="audio" /></div>}
+            {uploadedAudio && <div className="space-y-1">
+              <p className="text-sm">{uploadedAudio.fileName} · {uploadedAudio.durationSeconds}s</p>
+              <audio key={uploadedAudio.checksumSha256} src={apiUrl(uploadedAudio.streamUrl)} controls className="w-full" />
+            </div>}
+            {uploadError && <p role="alert" className="text-sm text-red-700">{uploadError}</p>}
+            {uploadNotice && <p role="status" className="text-sm text-emerald-800">{uploadNotice}</p>}
 
             <button
-              disabled={!poiList?.length}
-              onClick={() => alert('Đã upload và gắn file âm thanh thành công vào POI!')}
+              disabled={!uploadPoiId || !uploadFile || uploadPending}
+              onClick={() => void upload()}
               className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm active:scale-98 transition-all"
             >
-              Lưu & Tự động trích xuất thời lượng
+              {uploadPending ? 'Đang tải audio…' : 'Lưu & Tự động trích xuất thời lượng'}
             </button>
           </div>
         </div>

@@ -48,6 +48,11 @@ public class AdminTourController {
         return tours.setPois(id, request.poiIds());
     }
 
+    @PutMapping("/{id}/pois/{poiId}")
+    public TourResponse addPoi(@PathVariable Long id, @PathVariable Long poiId) {
+        return tours.addPoi(id, poiId);
+    }
+
     @PostMapping("/{id}/publish")
     public TourResponse publish(@PathVariable Long id) {
         return tours.publish(id);

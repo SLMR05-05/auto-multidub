@@ -13,6 +13,12 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
 
 app:
+  offline-packages:
+    worker-enabled: false
+  storage:
+    audio-dir: ./target/test-storage/audio
+    image-dir: ./target/test-storage/images
+    package-dir: ./target/test-storage/packages
   seed-admin:
     email: admin@test.local
     password: Admin123!

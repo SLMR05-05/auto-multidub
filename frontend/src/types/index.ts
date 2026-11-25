@@ -1,5 +1,5 @@
 export type Role = 'ADMIN' | 'EDITOR' | 'ANALYST' | 'USER';
-export type PoiStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type PoiStatus = 'DRAFT' | 'READY' | 'PUBLISHED' | 'ARCHIVED';
 export type TourStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type TriggerType = 'GPS' | 'QR' | 'MANUAL';
 export type AudioMode = 'PRERECORDED' | 'TTS';
@@ -155,4 +155,3 @@ export interface AppUser {
   phoneNumber?: string;
   provider?: 'LOCAL' | 'GOOGLE' | 'APPLE' | 'FACEBOOK';
 }
-

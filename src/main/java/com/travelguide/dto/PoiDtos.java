@@ -1,11 +1,30 @@
 package com.travelguide.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public class PoiDtos {
+
+    /** Text and geography are saved atomically; binary uploads use the resulting POI id. */
+    public record EditorRequest(
+            @NotNull @Valid PoiRequest poi,
+            @NotNull Map<@NotBlank String, @NotNull @Valid TranslationRequest> translations
+    ) {}
+
+    public record EditorResponse(AdminResponse poi, List<TranslationResponse> translations,
+                                 List<AudioResponse> audios, List<ImageResponse> images,
+                                 List<TourRef> tours) {}
+
+    public record ReadinessResult(AdminResponse poi, List<PublishIssue> issues) {}
+
+    public record PublishRequest(@NotEmpty List<@NotNull Long> poiIds) {}
+
+    public record GeofenceResponse(Long id, String name, double latitude, double longitude,
+                                   int radiusMeters, int priority, String status) {}
 
     public record PoiRequest(
             @Size(max = 120) String code,

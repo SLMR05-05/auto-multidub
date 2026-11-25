@@ -77,6 +77,7 @@ export default function VisitorLeafletMap({
 
   const [activeLayer, setActiveLayer] = useState<TileLayerType>('streets');
   const [showLayerMenu, setShowLayerMenu] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   // Initialize Map
   useEffect(() => {
@@ -117,10 +118,18 @@ export default function VisitorLeafletMap({
 
       tileLayerRef.current = tile;
       mapInstanceRef.current = map;
+      setMapReady(true);
+
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 100);
     });
 
     return () => {
       isMounted = false;
+      setMapReady(false);
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -174,7 +183,7 @@ export default function VisitorLeafletMap({
 
   // Synchronize POI Markers & Geofence Circles
   useEffect(() => {
-    if (!mapInstanceRef.current) return;
+    if (!mapInstanceRef.current || !mapReady) return;
 
     import('leaflet').then((L) => {
       const map = mapInstanceRef.current;
@@ -258,11 +267,11 @@ export default function VisitorLeafletMap({
         }
       }
     });
-  }, [pois, selectedPoi, onSelectPoi]);
+  }, [pois, selectedPoi, onSelectPoi, mapReady]);
 
   // Synchronize User Location Marker and Accuracy Circle
   useEffect(() => {
-    if (!mapInstanceRef.current || !userLocation) return;
+    if (!mapInstanceRef.current || !userLocation || !mapReady) return;
 
     import('leaflet').then((L) => {
       const map = mapInstanceRef.current;
@@ -315,7 +324,7 @@ export default function VisitorLeafletMap({
         accuracyCircleRef.current = null;
       }
     });
-  }, [userLocation, gpsAccuracy]);
+  }, [userLocation, gpsAccuracy, mapReady]);
 
   // Pan to user location when requested
   const handleRecenter = useCallback(() => {

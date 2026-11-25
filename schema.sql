@@ -173,7 +173,7 @@ CREATE TABLE `pois` (
     `radius_meters` INT NOT NULL DEFAULT 50 COMMENT 'PRD P1: 20m - 300m, mặc định 50m',
     `priority` INT NOT NULL DEFAULT 3 COMMENT '1 (thấp nhất) đến 5 (cao nhất)',
     `cooldown_minutes` INT NULL COMMENT 'Ghi đè thời gian cooldown riêng (null = 30 phút mặc định)',
-    `status` ENUM('DRAFT', 'PUBLISHED', 'ARCHIVED') NOT NULL DEFAULT 'DRAFT',
+    `status` ENUM('DRAFT', 'READY', 'PUBLISHED', 'ARCHIVED') NOT NULL DEFAULT 'DRAFT',
     `version` INT NOT NULL DEFAULT 1 COMMENT 'Phiên bản dữ liệu nội dung POI',
     `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

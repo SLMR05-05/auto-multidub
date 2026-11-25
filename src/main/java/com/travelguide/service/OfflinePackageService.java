@@ -10,9 +10,13 @@ import com.travelguide.repository.PoiImageRepository;
 import com.travelguide.repository.PoiTranslationRepository;
 import com.travelguide.util.CodeUtils;
 import com.travelguide.util.HashUtils;
+import com.travelguide.util.LanguageCatalog;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
@@ -59,9 +63,10 @@ public class OfflinePackageService {
         return packages.findAllByOrderByCreatedAtDesc().stream().map(this::toResponse).toList();
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public Response create(CreateRequest request) {
         String language = poiService.normalizeLanguage(request.languageCode());
+        long version = versions.current();
         List<Poi> published = poiService.publishedForPackage(request.tourId(), request.wardId());
         if (published.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
@@ -74,12 +79,78 @@ public class OfflinePackageService {
         pkg.setTourId(request.tourId());
         pkg.setWardId(request.wardId());
         pkg.setLanguageCode(language);
-        pkg.setDataVersion(versions.current());
+        pkg.setDataVersion(version);
         pkg.setPoiCount(published.size());
         pkg.setStatus(PackageStatus.BUILDING);
         pkg = packages.save(pkg);
 
+        return build(pkg, published, language);
+    }
+
+    /**
+     * Persist jobs in the publication transaction. The worker only sees committed
+     * jobs; BUILDING rows also survive a restart and are picked up automatically.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void queuePublishedCatalog(CatalogPublished event) {
+        int count = poiService.publishedForPackage(null, null).size();
+        for (String language : LanguageCatalog.codes()) {
+            OfflinePackage pkg = new OfflinePackage();
+            pkg.setCode(uniqueCode());
+            pkg.setName("Dữ liệu tham quan · " + language);
+            pkg.setLanguageCode(language);
+            pkg.setDataVersion(event.dataVersion());
+            pkg.setPoiCount(count);
+            pkg.setStatus(PackageStatus.BUILDING);
+            packages.save(pkg);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> pendingBuilds() {
+        return packages.findByStatusOrderByCreatedAtDesc(PackageStatus.BUILDING).reversed().stream()
+                .map(OfflinePackage::getId).toList();
+    }
+
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public Response buildPending(Long id) {
+        // Serialize workers across application instances.
+        OfflinePackage pkg = packages.findForBuild(id).orElse(null);
+        if (pkg == null) return null;
+        if (pkg.getStatus() != PackageStatus.BUILDING) return toResponse(pkg);
+        // All following reads share this database snapshot. A queued job may pick
+        // up a newer publication; its manifest records the actual snapshot version.
+        pkg.setDataVersion(versions.current());
+        List<Poi> published = poiService.publishedForPackage(pkg.getTourId(), pkg.getWardId());
+        pkg.setPoiCount(published.size());
+        return build(pkg, published, pkg.getLanguageCode());
+    }
+
+    @Transactional
+    public Response retry(Long id) {
+        OfflinePackage pkg = packages.findForBuild(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Offline package not found"));
+        if (pkg.getStatus() != PackageStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only failed packages can be retried");
+        }
+        pkg.setStatus(PackageStatus.BUILDING);
+        pkg.setErrorMessage(null);
+        pkg.setBuiltAt(null);
+        audit.record("RETRY_OFFLINE_PACKAGE", "OFFLINE_PACKAGE", id, null, toResponse(pkg));
+        return toResponse(pkg);
+    }
+
+    @Transactional
+    public void failBuild(Long id, String error) {
+        packages.findForBuild(id).filter(pkg -> pkg.getStatus() == PackageStatus.BUILDING).ifPresent(pkg -> {
+            pkg.setStatus(PackageStatus.FAILED);
+            pkg.setErrorMessage(truncate(error, 500));
+        });
+    }
+
+    private Response build(OfflinePackage pkg, List<Poi> published, String language) {
         try {
+            if (published.isEmpty()) throw new IOException("No published POIs match this package scope");
             Path zip = buildZip(pkg, published, language);
             pkg.setFilePath(zip.toString());
             pkg.setSizeBytes(Files.size(zip));
@@ -165,13 +236,15 @@ public class OfflinePackageService {
                 entry.put("description", selected == null ? null : selected.getDescription());
                 entry.put("ttsScript", selected == null ? null : selected.getTtsScript());
 
-                PoiAudio audio = audioMap.getOrDefault(poi.getId(), List.of()).stream()
-                        .filter(item -> item.getLanguageCode().equals(language))
-                        .findFirst().orElse(null);
+                List<PoiAudio> availableAudio = audioMap.getOrDefault(poi.getId(), List.of());
+                PoiAudio audio = availableAudio.stream().filter(item -> item.getLanguageCode().equals(language))
+                        .findFirst().orElseGet(() -> availableAudio.stream()
+                                .filter(item -> item.getLanguageCode().equals(contentLanguage)).findFirst().orElse(null));
                 entry.put("audio", null);
                 if (audio != null) {
                     Path audioPath = storage.resolve(audio.getFilePath());
-                    if (Files.exists(audioPath)) {
+                    if (!Files.exists(audioPath)) throw new IOException("Missing audio: " + audio.getFileName());
+                    {
                         String extension = audio.getFormat() == null ? "mp3" : audio.getFormat();
                         String entryName = "audio/" + poi.getId() + "/audio." + extension;
                         String checksum = writeEntry(zip, entryName, audioPath);
@@ -190,7 +263,7 @@ public class OfflinePackageService {
                 for (PoiImage image : imageMap.getOrDefault(poi.getId(), List.of())) {
                     Path imagePath = storage.resolve(image.getFilePath());
                     if (!Files.exists(imagePath)) {
-                        continue;
+                        throw new IOException("Missing image: " + image.getFileName());
                     }
                     String extension = extensionOf(image.getContentType(), image.getFileName());
                     String entryName = "images/" + image.getId() + "." + extension;

@@ -94,6 +94,29 @@ public class TourService {
     }
 
     @Transactional
+    public TourResponse addPoi(Long tourId, Long poiId) {
+        Tour tour = find(tourId);
+        if (tour.getStatus() == TourStatus.ARCHIVED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Tour đã lưu trữ.");
+        }
+        Poi poi = poiService.find(poiId);
+        if (poi.getStatus() == PoiStatus.ARCHIVED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "POI đã lưu trữ.");
+        }
+        List<TourPoi> links = tourPois.findByTourIdOrderByOrderIndexAsc(tourId);
+        if (links.stream().noneMatch(link -> link.getPoi().getId().equals(poiId))) {
+            TourPoi link = new TourPoi();
+            link.setTour(tour);
+            link.setPoi(poi);
+            link.setOrderIndex(links.stream().mapToInt(TourPoi::getOrderIndex).max().orElse(-1) + 1);
+            tourPois.save(link);
+            touchIfPublished(tour);
+            audit.record("ADD_TOUR_POI", "TOUR", tourId, null, Map.of("poiId", poiId));
+        }
+        return toResponse(tour, true);
+    }
+
+    @Transactional
     public TourResponse setPois(Long tourId, List<Long> poiIds) {
         Tour tour = find(tourId);
         if (poiIds == null) {

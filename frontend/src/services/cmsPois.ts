@@ -1,6 +1,11 @@
 import type { PoiStatus } from '@/types';
 import type { PublishResult } from './cms';
 import { requestCms } from './cms';
+import { listCmsLanguages } from './cmsLanguages';
+
+export const poiStatusLabels: Record<PoiStatus, string> = {
+  DRAFT: 'Bản nháp', READY: 'Sẵn sàng duyệt', PUBLISHED: 'Đã xuất bản', ARCHIVED: 'Đã lưu trữ',
+};
 
 export interface PoiInput {
   code: string;
@@ -30,6 +35,21 @@ export interface TranslationInput {
   ttsScript: string;
 }
 export interface Translation extends TranslationInput { languageCode: string }
+
+export interface CmsPoiImage {
+  id: number; fileName: string; contentType: string; sizeBytes: number;
+  sortOrder: number; coverImage: boolean; url: string;
+}
+
+export interface EditorResponse {
+  poi: CmsPoi;
+  translations: Translation[];
+  audios: CmsPoiAudio[];
+  images: CmsPoiImage[];
+  tours: { id: number; code: string; name: string; orderIndex: number }[];
+}
+
+export type CmsGeofence = Pick<CmsPoi, 'id' | 'name' | 'latitude' | 'longitude' | 'radiusMeters' | 'priority' | 'status'>;
 
 export interface CmsPoiAudio {
   id: number;
@@ -77,13 +97,72 @@ export function getPoiTranslations(id: number, signal: AbortSignal) {
 }
 
 export async function getPoiEditor(id: string | undefined, signal: AbortSignal) {
-  const [wards, stops, poi, translations] = await Promise.all([
+  const [wards, stops, editor, languages, geofences] = await Promise.all([
     listCmsWards(signal),
     requestCms<StopOption[]>('/bus-stops', { signal }),
-    id ? requestCms<CmsPoi>(`/pois/${id}`, { signal }) : null,
-    id ? requestCms<Translation[]>(`/pois/${id}/translations`, { signal }) : [],
+    id ? getCmsPoiEditor(Number(id), signal) : null,
+    listCmsLanguages(signal),
+    requestCms<CmsGeofence[]>('/pois/geofences', { signal }),
   ]);
-  return { wards, stops, poi, vietnamese: translations.find((translation) => translation.languageCode === 'vi') };
+  return { wards, stops, editor, languages, geofences };
+}
+
+export function getCmsPoiEditor(id: number, signal?: AbortSignal) {
+  return requestCms<EditorResponse>(`/pois/${id}/editor`, { signal });
+}
+
+export function savePoiEditor(poi: PoiInput, translations: Record<string, TranslationInput>, id?: number) {
+  return requestCms<EditorResponse>(id == null ? '/pois/editor' : `/pois/${id}/editor`, {
+    method: id == null ? 'POST' : 'PUT', body: JSON.stringify({ poi, translations }),
+  });
+}
+
+export function markPoiReady(id: number) {
+  return requestCms<{ poi: CmsPoi; issues: PublishResult['issues'] }>(`/pois/${id}/ready`, { method: 'POST' });
+}
+
+export async function listAllCmsPois(signal?: AbortSignal) {
+  const pois: CmsPoi[] = [];
+  let page = 0;
+  let totalPages = 1;
+  do {
+    const result = await requestCms<{ content: CmsPoi[]; totalPages: number }>(`/pois?page=${page++}&size=100`, { signal });
+    pois.push(...result.content);
+    totalPages = result.totalPages;
+  } while (page < totalPages);
+  return pois;
+}
+
+export function uploadPoiImage(id: number, file: File) {
+  const body = new FormData();
+  body.append('file', file);
+  return requestCms<CmsPoiImage>(`/pois/${id}/images`, { method: 'POST', body });
+}
+
+export function uploadPoiAudio(id: number, language: string, file: File) {
+  const body = new FormData();
+  body.append('file', file);
+  return requestCms<CmsPoiAudio>(`/pois/${id}/audio?lang=${encodeURIComponent(language)}`, { method: 'POST', body });
+}
+
+export function deletePoiImage(id: number, imageId: number) {
+  return requestCms(`/pois/${id}/images/${imageId}`, { method: 'DELETE' });
+}
+
+export function setPoiCover(id: number, imageId: number) {
+  return requestCms<CmsPoiImage>(`/pois/${id}/images/${imageId}/cover`, { method: 'PUT' });
+}
+
+export function reorderPoiImages(id: number, imageIds: number[]) {
+  return requestCms<CmsPoiImage[]>(`/pois/${id}/images/order`, { method: 'PUT', body: JSON.stringify({ imageIds }) });
+}
+
+export function deletePoiAudio(id: number, language: string) {
+  return requestCms(`/pois/${id}/audio/${encodeURIComponent(language)}`, { method: 'DELETE' });
+}
+
+export function deletePoiTranslation(id: number, language: string) {
+  return requestCms(`/pois/${id}/translations/${encodeURIComponent(language)}`, { method: 'DELETE' });
 }
 
 export function saveCmsPoi(poi: PoiInput, id?: number) {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { VisitorCatalogContent } from '@/components/visitor/VisitorCatalog';
 import type { Poi } from '@/types';
+import GoogleDirectionsModal from '@/components/visitor/GoogleDirectionsModal';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useAssistantStore } from '@/stores/assistantStore';
@@ -49,6 +50,7 @@ function PoiDetailContent({ poi, pois }: { poi: Poi; pois: Poi[] }) {
 
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [customQuestion, setCustomQuestion] = useState('');
+  const [isDirectionsOpen, setIsDirectionsOpen] = useState(false);
 
   const { currentPoi, isPlaying, playPoi, pause, resume, seek, currentTime, duration, playbackRate: playbackSpeed, setPlaybackRate: setPlaybackSpeed } = usePlayerStore();
   const { currentLang } = useLanguageStore();
@@ -327,15 +329,14 @@ function PoiDetailContent({ poi, pois }: { poi: Poi; pois: Poi[] }) {
               </h3>
 
               <div className="grid grid-cols-2 gap-2.5">
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${poi.latitude},${poi.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setIsDirectionsOpen(true)}
                   className="flex items-center justify-center gap-2 py-3 px-3 rounded-2xl bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs transition-colors border border-sky-100 text-center"
                 >
                   <Navigation className="w-4 h-4 text-sky-600 shrink-0" />
                   <span>Chỉ đường Maps</span>
-                </a>
+                </button>
 
                 <button
                   onClick={() => toggleFavorite(poi.id)}
@@ -447,6 +448,13 @@ function PoiDetailContent({ poi, pois }: { poi: Poi; pois: Poi[] }) {
           </div>
         </div>
       </div>
+
+      {/* Google Maps Directions Modal */}
+      <GoogleDirectionsModal
+        poi={poi}
+        isOpen={isDirectionsOpen}
+        onClose={() => setIsDirectionsOpen(false)}
+      />
     </div>
   );
 }

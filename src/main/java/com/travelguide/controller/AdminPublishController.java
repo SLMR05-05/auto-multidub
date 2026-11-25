@@ -1,6 +1,8 @@
 package com.travelguide.controller;
 
 import com.travelguide.dto.PoiDtos.PublishResult;
+import com.travelguide.dto.PoiDtos.PublishRequest;
+import jakarta.validation.Valid;
 import com.travelguide.service.DataVersionService;
 import com.travelguide.service.PoiService;
 import com.travelguide.service.SystemSettingService;
@@ -25,10 +27,10 @@ public class AdminPublishController {
         this.settings = settings;
     }
 
-    /** CMS "Xuất bản": validates published POIs and increments data_version once. */
+    /** Validate the entire selection before publishing it at one data version. */
     @PostMapping("/publish")
-    public PublishResult publish() {
-        return pois.publishAll();
+    public PublishResult publish(@Valid @RequestBody(required = false) PublishRequest request) {
+        return request == null ? pois.publishAll() : pois.publishSelected(request.poiIds());
     }
 
     @GetMapping("/settings")

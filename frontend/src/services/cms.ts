@@ -42,10 +42,11 @@ export interface PublishResult {
   issues: { poiId: number; poiCode: string; message: string }[];
 }
 
-export function publishCatalog(token: string) {
+export function publishCatalog(token: string, poiIds?: number[]) {
   return requestJson<PublishResult>('/api/v1/admin/publish', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: poiIds ? JSON.stringify({ poiIds }) : undefined,
   });
 }
 
@@ -54,6 +55,6 @@ export async function requestCms<T>(path: string, options: RequestInit = {}) {
   if (!session) throw new ApiError(401);
   const headers = new Headers(options.headers);
   headers.set('Authorization', `Bearer ${session.token}`);
-  if (options.body) headers.set('Content-Type', 'application/json');
+  if (typeof options.body === 'string') headers.set('Content-Type', 'application/json');
   return requestJson<T>(`/api/v1/admin${path}`, { ...options, headers });
 }
